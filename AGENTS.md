@@ -149,13 +149,14 @@
 - ✅ 需求基线确认：按《整体介绍》重建，项目名「职航 CareerPath」，路线 A（Java + Python 双服务），**一期做全模块 1/3/4/5/6/7，二期简化 2/8/9**。
 - ✅ 重构蓝图：`docs/P0-重构方案.md`，一期 15 张表 / 7 个页面 / T0–T6，二期 +2 表 +2 页 / T7–T9。
 - ✅ 环境就绪：JDK 25.0.2、Maven 3.9.16（用户 PATH）、`~/.m2/settings.xml` 阿里云镜像；Spring Boot 3.5.16 + MyBatis-Plus 3.5.18.1 已锁定。
-- 🟡 **T0 已交付，待 Trae 评审**（2026-11-15）：
-  - `backend-java/`：Spring Boot 3.5.16 + MyBatis-Plus 3.5.18.1 + Security/JWT 骨架，包名 `com.careerpath`，`GET /api/health`（含 DB 与分析服务双探活），统一错误体与 `X-Trace-Id`，启动幂等导入 61 技能 / 6 类。
+- 🟡 **T0 已交付，待 Trae 评审**（2026-11-15）：逐条证据见 `docs/T0-自检报告.md`（按 6.2 的 A/C/D/E/G 五组）。
+  - `backend-java/`：Spring Boot 3.5.16 + MyBatis-Plus 3.5.18.1 + Security/JWT 骨架，包名 `com.careerpath`，`GET /api/health`（含 DB 与分析服务双探活），统一错误体与 `X-Trace-Id`，启动幂等导入 61 技能 / 6 类。jar 已核验不含任何 T1 包（auth/profile/user/stats）。
   - `analysis-service/`：`/internal/health`、`/internal/parse/jd`、`/internal/match` 三个内部接口，共享密钥校验；算分按 required-only 口径（证据不进分数），83 项 pytest 全绿。
-  - 数据库：`career_path`（utf8mb4），**15 张表**，`scripts/init_db.py` 幂等建库。
-  - `frontend/`：Vue 3 + Element Plus，9 → **7 个页面**路由骨架，`/api` 代理 8080。
-  - `scripts/dev-up.sh` / `dev-down.sh`：三进程一键起停；实测三进程 3 秒内全部就绪、退出码 0，`dev-down` 正常清理 pid 与端口。
-  - 前端 `npm run build` 通过，分包实测 element-plus 968 kB / vendor 309 kB / 入口 8.45 kB。
-  - 自检修正：`EMPTY_PROFILE` 时 `bonusScore` 原为 `0.0`，已改为与 `requiredScore` 同为 `null`，并补守卫用例。
+  - 数据库：`career_path`，**15 张表**、20 条外键（用户数据 CASCADE / 字典 NO ACTION）、7 组唯一约束；`utf8mb4_0900_ai_ci`；`scripts/init_db.py` 连跑两次表数与行数不变。
+  - `frontend/`：Vue 3 + Element Plus，9 → **7 个页面**路由骨架，`/api` 代理 8080；7 页经无头浏览器实测渲染，概览页自检卡显示真实数字（61 技能 / 6 分类 / 词典 61 项）。
+  - `scripts/dev-up.sh` / `dev-down.sh`：三进程一键起停；实测三项均 3 秒内就绪、退出码 0，`dev-down` 正常清理 pid 与端口。
+  - 前端 `npm run build` 通过，分包实测 element-plus 968 kB / vendor 305.5 kB / 入口 6.4 kB。
+  - 自检修正四处：`EMPTY_PROFILE` 时 `bonusScore` 原为 `0.0`（改为 `null`）；`dev-up.sh` 探测漏内部令牌；T0 快照中混入 T1 前端（auth store 与路由守卫，已剥离）；`schema.sql` 库 collation 与库内 15 表不一致（已对齐 `utf8mb4_0900_ai_ci`）。
+- 🅿️ **T1 代码暂存于 `wip/t1-trae-1950`**（4 笔：`94615bb`/`8504733`/`8c29aa6`/`7e272c7`）。19:37–19:53 期间由评审侧在工作区实现并提交，与单写者原则及 6.0 闸门冲突；`dev` 已回到 T0 快照，T0-R 通过后 `git merge wip/t1-trae-1950` 接回，不删不改写。
 - ⬜ T1–T6 未开始；按 6.0 评审闸门，T0-R 通过后才开 T1。
 
