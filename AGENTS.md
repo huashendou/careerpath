@@ -1,8 +1,10 @@
 # 职航 CareerPath · 项目总提示词
 
 > 本文件是本项目的「总提示词」。每次在本目录发起任务时，先读这个文件，按这里的目标、边界和约定工作。
-> 版本 v3.1 · 2026-11-15 · 改为 Java + Python 双服务架构，项目名统一为「职航 CareerPath」
+> 版本 v3.2 · 2026-11-15 · 改为 Java + Python 双服务架构，项目名统一为「职航 CareerPath」
 > **v3.1**：范围口径由「砍掉模块 2/8」改为「一期做全 1/3/4/5/6/7，二期做简化版 2/8/9」（用户裁决：重核心功能，其余慢慢做）
+> **v3.2**：阶段闸门改为「先做成品、后逐阶段评审」（用户裁决 21:10）——T3–T9 一次性交付，
+> 评审仍按阶段逐个进行，先例（T0-R 的「有条件通过」）与 P0 清零要求不变。
 > 需求基线：`项目开发指导/职航_CareerPath_项目整体介绍.docx`；施工蓝图：`docs/P0-重构方案.md`；接口契约：`docs/协作看板.md`
 
 ## 一、项目是什么
@@ -163,5 +165,19 @@
   - 自检证据（`docs/T1-自检报告.md`）：接口 16 项断言全通过；Java 测试 10 → **14** 项（新增 `StatsControllerTest`）；守卫用无头 Edge 实测无令牌/有效令牌/伪造令牌三种情形。
   - 自检修掉 1 个缺陷（`72b9c0d`）：`profileCompleted` 原判「`user_profile` 有行」，只填手机号也显示「已完善」，改为「学校与专业均非空」，反向验证已复现旧行为。
   - 库里测试账号已清空（`user` 0 行），种子 61 技能 / 6 分类未变；jar 已重打含该修复。
-- ⬜ T3–T6 未开始；**T1-R 通过后开 T3**。
+- ⬜ T3–T6 未开始；**T1-R 通过后开 T3**（此条已于 21:10 被用户裁决取代，见下）。
+
+- 🟡 **T3–T9 一次性交付，全部待评审**（2026-11-15 21:10，用户裁决「先做成品、后逐阶段评审」）。
+  **只改评审顺序，不降验收标准**：Trae 按 T1-R → T3-R → … → T9-R 逐阶段出评审文件，P0 不得带入下一阶段。
+  - 交付范围：T3 技能图谱 + JD 解析、T4 证据链 + 匹配报告、T5 学习闭环、T6 概览与打印、
+    T7 投递清单（二期）、T8 面试复盘（二期）、T9 数据看板（并入概览，不单开页面）。
+  - 数据库 **17 张表**（+`job_application`、`interview_record`），`skill_evidence.verify_status` 默认值对齐
+    契约 `unverified`，`skill_relation` 补 41 条种子（消除 c3.3 禁止的「预留空表」）。
+  - 接口：`/api/skills*`、`/api/jobs*`（含 `parse` 与 `requirements`）、`/api/user-skills`、`/api/evidence*`、
+    `/api/projects*`、`/api/match|reports`、`/api/tasks*`、`/api/applications*`、`/api/interviews*`、
+    `/api/stats/insights`。契约见看板 c3.5。
+  - 页面：一期 7 页全部落地 + 二期 2 页，8 个路由用真实数据在无头 Edge 逐一渲染并断言数据特征串。
+  - 测试：Java **32 项**（新增 job 5 / portfolio 5 / task 4 / phase2 4）、pytest 83 项全绿；
+    `npm run build` 通过（element-plus 968.12 kB / vendor 309.20 kB）。
+  - 证据与待裁定项：`docs/T3-T9-自检报告.md`（一阶段一节，含 8 条裁定清单）。
 
