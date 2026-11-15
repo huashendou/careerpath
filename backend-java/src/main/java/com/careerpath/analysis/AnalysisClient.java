@@ -87,6 +87,42 @@ public class AnalysisClient {
         }
     }
 
+    /**
+     * 匹配算分（T4）。请求与响应字段全部与契约同名，Java 侧不做命名转换。
+     *
+     * <p>返回 {@code Map} 而不是逐字段 record：这份结果会被**原样存档**到
+     * {@code skill_match_result.detail}，将来算法加字段时历史报告仍能完整回放；
+     * 用 record 会丢掉未声明的字段，等于给未来挖坑。
+     */
+    public java.util.Map<String, Object> match(java.util.Map<String, Object> payload) {
+        try {
+            java.util.Map<String, Object> body = restClient.post()
+                    .uri("/internal/match")
+                    .header("X-Internal-Token", token)
+                    .header(TraceIdFilter.HEADER, currentTraceId())
+                    .body(payload)
+                    .retrieve()
+                    .body(new org.springframework.core.ParameterizedTypeReference<java.util.Map<String, Object>>() {
+                    });
+            if (body == null || !body.containsKey("status") || !body.containsKey("counts")
+                    || !body.containsKey("radar")) {
+                log.error("分析服务匹配响应不符合契约，缺少 status/counts/radar");
+                throw new ApiException(ErrorCode.ANALYSIS_FAILED);
+            }
+            return body;
+        } catch (ApiException ex) {
+            throw ex;
+        } catch (org.springframework.web.client.RestClientResponseException ex) {
+            // 4xx 说明我们发的请求不对（契约漂移），5xx 说明对面算不动：两种都归「依赖不可用」，
+            // 但日志要能区分，否则排查时只能看到一层 503。
+            log.error("分析服务匹配失败：HTTP {} {}", ex.getStatusCode().value(), ex.getResponseBodyAsString());
+            throw new ApiException(ErrorCode.ANALYSIS_UNAVAILABLE);
+        } catch (Exception ex) {
+            log.error("调用分析服务匹配失败：{}", ex.getMessage());
+            throw new ApiException(ErrorCode.ANALYSIS_UNAVAILABLE);
+        }
+    }
+
     private String currentTraceId() {
         String traceId = MDC.get(TraceIdFilter.MDC_KEY);
         return traceId == null ? "-" : traceId;
