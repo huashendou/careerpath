@@ -41,3 +41,6 @@ target/
 build/
 *.class
 *.jar
+
+# 三进程日志
+.logs/
