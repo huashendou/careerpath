@@ -1,0 +1,659 @@
+{
+  "meta": {
+    "name": "职能雷达 · 岗位技能模型",
+    "version": "v0.1",
+    "revision": "r2",
+    "revisionNote": "r2（2026-11-15）：计分口径改为 core-only —— 基础匹配度只使用 core，plus 完全退出分子分母并独立展示。技能项、岗位、权重数值与 targets 一律未改动；meta.version 仍为 v0.1，因为「示例数据 v0.1」指数据本身。",
+    "updatedAt": "2026-11-15",
+    "displayBadge": "示例数据 v0.1",
+    "disclaimer": "示例数据 v0.1：本模型依据公开招聘信息的常见技能要求归纳整理，权重与目标等级为产品演示用的示例值，不是任何企业的官方标准，也不代表行业统一口径。后续须用真实招聘 JD 校准。",
+    "seniority": "本版统一面向「校招 / 实习（初级）」岗位，目标等级按应届生可达到的水平设定，不代表资深岗位要求。",
+    "scoring": {
+      "version": "v0.2-core-only",
+      "changedAt": "2026-11-15",
+      "changeNote": "由「全部 requirements 计入匹配度」改为「仅 core 计入基础匹配度，plus 独立展示」。这是口径变更，不是数据变更：三岗权重合计仍为 100，core 权重仍为 79 / 89 / 83。",
+      "formula": "M_core = Σ_core(w_i × min(L_i, T_i)) / Σ_core(w_i × T_i) × 100%",
+      "formulaNote": "分子与分母都只在 type=core 的子集内求和。分母不是 100，而是「core 权重 × 目标等级」之和；因为分子分母同口径，core 合计 79 / 89 / 83 的差异会自动归一化，无需也不必把 core 放大到 100。",
+      "typeNote": "type=core：核心要求，参与基础匹配度、技能缺口与补强优先级。type=plus：加分项，不参与基础匹配度，未掌握不扣分、已掌握不加分，只在「额外优势」区块展示。core 与 plus 的权重共同构成岗位模型的 100 分描述，但只有 core 进入计分。",
+      "weightPolicy": {
+        "totalWeight": 100,
+        "composition": "完整岗位模型权重 = core + plus = 100。三个岗位当前 core 分别为 79 / 89 / 83，plus 分别为 21 / 11 / 17。",
+        "coreOnly": "基础匹配度只使用 core 的权重与目标等级；plus 的权重既不在分子，也不在分母。",
+        "noRenormalize": "不把 core 权重等比放大到 100。等比缩放不改变 M_core 数值，但会让面板显示的权重与模型不一致，破坏「权重即占比」的可读性，故保持原值。",
+        "plusIsNotFree": "plus 权重不计入 M_core，因此「岗位模型 100 分」与「匹配度分母」不是同一个量，界面必须分开呈现，不得让用户以为 plus 已算进那 100 分。"
+      },
+      "levelRule": "L_i = clamp(round(自评等级), 0, 5)；未填写按 0。有效等级 L_eff 见 anyOf 规则。",
+      "statusRule": "缺失 = L_eff 为 0；薄弱 = 0 < L_eff < T；已掌握 = L_eff ≥ T。三态只对 core 输出；plus 只输出「已掌握 / 待补」两态。",
+      "gapRule": "gap_i = max(T_i − L_eff_i, 0)，只对 core 计算。补强优先级 priority_i = core 权重 w_i × gap_i，降序取 Top 3。plus 不进入优先级排序。",
+      "anyOf": {
+        "rule": "requirement 带 anyOf 时，该要求的有效等级 L_eff = max(自身技能等级, anyOf 各成员等级)。",
+        "countOnce": "该要求只计一次：分子加 w × min(L_eff, T)，分母加 w × T。anyOf 成员不得再作为独立 requirement 出现，也不单独进入任何维度画像。",
+        "gapOnce": "差距分析同样只产出一条记录：gap = max(T − L_eff, 0)，priority = w × gap。不允许 vue 与 react 各出一条缺口。",
+        "missingMember": "anyOf 成员若不在技能词典中，忽略该成员，按剩余项取最大值。",
+        "keep": "前端岗 vue 要求的 anyOf=[react] 保留：学 React 的学生用 React 等级参与该项计分，不会因为没有 Vue 而丢掉那 9 分。"
+      },
+      "radar": {
+        "target": "T_dim = Σ_core(w × T) / Σ_core(w)，仅用 core。该维度无 core 要求时返回 null。",
+        "current": "L_dim = Σ_core(w × L_eff) / Σ_core(w)，与 target 同权重、同口径，保证两条线可比。plus 不抬高当前线。",
+        "plus": "plus 不进入雷达目标线，也不进入当前线；plus 只在「额外优势」区块独立展示。",
+        "emptyDim": "无 core 的维度：T_dim 与 L_dim 均为 null，禁止用 0 代替。绘制时保留轴线与标签并标注「无核心要求」，不画数据点，折线在相邻有效轴之间直连，不产生除零。",
+        "axes": "六条轴恒定，不因某轴为空而减少轴数；空轴只影响该轴是否绘制数据点。",
+        "note": "当前数据实测：前端「数据与存储」「分析与洞察」两轴为空，Java 后端「分析与洞察」一轴为空，数据分析六轴齐全。因此前端雷达的有效数据轴为 4 条、Java 为 5 条、分析为 6 条。"
+      },
+      "edgeCases": [
+        {
+          "case": "未做任何自评 / 自评表为空",
+          "handling": "全部 L_i 视为 0，M_core 计算为 0；界面在结果区显示「尚未完成自评」，不把 0% 当作真实水平呈现。计算函数不返回 NaN。"
+        },
+        {
+          "case": "全部自评为 0",
+          "handling": "M_core = 0%，是有效结果。Top 3 按 w × T 降序给出，等价于「从权重最高的核心项开始补」。"
+        },
+        {
+          "case": "某维度无 core 要求",
+          "handling": "T_dim = L_dim = null，按 radar.emptyDim 处理；不参与 M_core，不做除法，不出现除零或 Infinity。"
+        },
+        {
+          "case": "Σ_core(w × T) = 0（无 core，或 core 目标等级全为 0）",
+          "handling": "返回 null 并附原因码 NO_CORE_REQUIREMENT；界面显示「该岗位暂无核心要求」。禁止显示 0%、NaN 或 Infinity。"
+        },
+        {
+          "case": "岗位引用了 skills.json 中不存在的 skillId",
+          "handling": "构建期校验直接失败（fail fast）。运行期若仍出现，跳过该条并 console.warn，不计入分子分母，不影响其余项。"
+        },
+        {
+          "case": "同一岗位 requirements 内 skillId 重复",
+          "handling": "构建期校验直接失败。运行期按首次出现去重（保留首条并 warn），防止同一技能权重被累加两次。"
+        },
+        {
+          "case": "anyOf 成员同时被写成独立 requirement",
+          "handling": "视为数据错误，构建期校验失败。运行期以 owning requirement 为准，独立那条忽略，避免同一技能被计两次。"
+        },
+        {
+          "case": "自评等级越界、小数或非数字",
+          "handling": "非数字按 0；小数四舍五入；结果 clamp 到 [0, 5]。"
+        },
+        {
+          "case": "自评包含本岗位未要求的技能",
+          "handling": "保留在个人画像中展示，但不进入该岗位的分子分母——唯一例外是它被该岗位某条要求作为 anyOf 成员引用。"
+        },
+        {
+          "case": "岗位权重合计 ≠ 100",
+          "handling": "构建期校验失败。运行期不自动归一化、不静默修正，直接报错，避免输出看似正常的错误百分比。"
+        }
+      ]
+    },
+    "calibration": {
+      "status": "pending",
+      "currentSource": "公开招聘信息的常见技能要求归纳（示例）",
+      "plannedSources": [
+        "真实企业 JD 抽样（每岗位 ≥ 30 条）",
+        "岗位技能词频统计",
+        "从业者访谈校准目标等级"
+      ],
+      "reservedFields": [
+        "version",
+        "sourceSample",
+        "calibratedAt",
+        "sampleSize"
+      ],
+      "note": "校准时只替换 requirements 的 weight / target / type 并升版本号，数据结构不变，前端无需改动。若调整 core 与 plus 的划分，必须同步更新文档中的 core 权重合计（当前 79 / 89 / 83）并重新跑计分测试。"
+    },
+    "coverageRule": "每项技能至少被一个岗位要求引用；未被引用的技能不进入词典，避免自评空转。新增技能须同时指定其归属岗位与权重。 anyOf 成员视为「被引用」但不单独计权。"
+  },
+  "jobs": [
+    {
+      "id": "frontend",
+      "name": "前端开发工程师",
+      "shortName": "前端开发",
+      "seniority": "校招 / 实习（初级）",
+      "summary": "负责 Web 与移动端页面开发，把设计稿变成可用、可维护、性能合格的界面。",
+      "notes": "权重向「语言基础 + 交互还原」倾斜：JavaScript 与 HTML/CSS 合计 17，高于框架本身的 9。校招最常见的偏差是只会框架、不熟原生，脱离框架就写不动。工程实践共 18（core 13 + plus 5），因为「能写页面但不会交付」是这岗位最高频的差距项；其中接口联调 2 分属工程实践，技术文档 2 分属交付与协作。数据与洞察两维全部是 plus（10 分），不进入基础匹配度，这是本岗雷达只有 4 条数据轴的直接原因。",
+      "requirements": [
+        {
+          "skillId": "js-core",
+          "weight": 9,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "html-css",
+          "weight": 8,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "browser-basic",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "ts-type",
+          "weight": 5,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "network-basic",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "ds-algo",
+          "weight": 2,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "vue",
+          "weight": 9,
+          "target": 4,
+          "type": "core",
+          "anyOf": [
+            "react"
+          ],
+          "anyOfNote": "Vue 或 React 任一达到目标等级即可，取较高者计分"
+        },
+        {
+          "skillId": "component-design",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "frontend-build",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "responsive-mobile",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "css-toolchain",
+          "weight": 3,
+          "target": 2,
+          "type": "core"
+        },
+        {
+          "skillId": "node-runtime",
+          "weight": 3,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "mini-program",
+          "weight": 1,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "git",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "debug",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "perf-opt",
+          "weight": 3,
+          "target": 2,
+          "type": "core"
+        },
+        {
+          "skillId": "unit-test",
+          "weight": 2,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "code-review",
+          "weight": 2,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "security-basic",
+          "weight": 1,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "api-integration",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "tech-doc",
+          "weight": 2,
+          "target": 2,
+          "type": "core"
+        },
+        {
+          "skillId": "sql-query",
+          "weight": 3,
+          "target": 1,
+          "type": "plus"
+        },
+        {
+          "skillId": "data-collect",
+          "weight": 2,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "data-viz",
+          "weight": 3,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "metrics",
+          "weight": 2,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "requirement-analysis",
+          "weight": 3,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "project-delivery",
+          "weight": 3,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "communication",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "teamwork",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        }
+      ],
+      "scoringScope": "基础匹配度仅取 type=core 的 requirement；type=plus 只用于「额外优势」展示。"
+    },
+    {
+      "id": "java-backend",
+      "name": "Java 后端开发工程师",
+      "shortName": "Java 后端",
+      "seniority": "校招 / 实习（初级）",
+      "summary": "负责服务端接口、业务逻辑与数据存储，保证系统的正确性、稳定性与可维护性。",
+      "notes": "语言深度权重最集中：Java 基础与并发合计 19，后端在这一块筛人最狠。数据与存储 18（含事务、索引、表设计），明显高于另两岗；补入操作系统基础与接口设计，这两项是后端笔试与日常工作的必需项。分析与洞察共 3 分且全部为 plus（不参与匹配度），够看懂监控与业务数据即可，因此本岗该维度无 core、雷达不画该轴。",
+      "requirements": [
+        {
+          "skillId": "java-basic",
+          "weight": 10,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "java-concurrency",
+          "weight": 9,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "jvm-basic",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "ds-algo",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "network-basic",
+          "weight": 2,
+          "target": 2,
+          "type": "core"
+        },
+        {
+          "skillId": "os-basic",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "spring-boot",
+          "weight": 10,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "orm-framework",
+          "weight": 5,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "mq",
+          "weight": 3,
+          "target": 2,
+          "type": "core"
+        },
+        {
+          "skillId": "build-tool-java",
+          "weight": 3,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "spring-cloud",
+          "weight": 3,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "git",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "unit-test",
+          "weight": 3,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "linux",
+          "weight": 3,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "debug",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "docker",
+          "weight": 1,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "perf-opt",
+          "weight": 2,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "api-integration",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "tech-doc",
+          "weight": 1,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "sql-query",
+          "weight": 5,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "sql-optimize",
+          "weight": 5,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "db-mysql",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "db-design",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "redis",
+          "weight": 2,
+          "target": 2,
+          "type": "core"
+        },
+        {
+          "skillId": "metrics",
+          "weight": 2,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "biz-insight",
+          "weight": 1,
+          "target": 3,
+          "type": "plus"
+        },
+        {
+          "skillId": "requirement-analysis",
+          "weight": 3,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "project-delivery",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "communication",
+          "weight": 1,
+          "target": 3,
+          "type": "plus"
+        },
+        {
+          "skillId": "teamwork",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        }
+      ],
+      "scoringScope": "基础匹配度仅取 type=core 的 requirement；type=plus 只用于「额外优势」展示。"
+    },
+    {
+      "id": "data-analyst",
+      "name": "数据分析师",
+      "shortName": "数据分析",
+      "seniority": "校招 / 实习（初级）",
+      "summary": "负责取数、清洗、分析并输出结论，用数据回答业务问题、支撑决策。",
+      "notes": "唯一以「数据 + 洞察」为双核心的岗位：两层合计 41（数据 21 + 洞察 20，其中 2 分为 plus），接近总分一半，是它与两个开发岗的结构性差异。SQL 单项 9 为三岗最高（分析师每天都在写查询）。工程实践压到 10（core 7 + plus 3），校招不要求交付生产级代码，但不能完全不懂 Git 与调试。",
+      "requirements": [
+        {
+          "skillId": "python-basic",
+          "weight": 9,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "ds-algo",
+          "weight": 4,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "regex",
+          "weight": 2,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "oop-design",
+          "weight": 2,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "pandas",
+          "weight": 9,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "excel",
+          "weight": 6,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "bi-tool",
+          "weight": 6,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "ml-basic",
+          "weight": 3,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "git",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "debug",
+          "weight": 3,
+          "target": 2,
+          "type": "core"
+        },
+        {
+          "skillId": "linux",
+          "weight": 2,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "code-review",
+          "weight": 1,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "sql-query",
+          "weight": 9,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "data-clean",
+          "weight": 5,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "dw-model",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "data-quality",
+          "weight": 3,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "metrics",
+          "weight": 4,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "stats-basic",
+          "weight": 4,
+          "target": 4,
+          "type": "core"
+        },
+        {
+          "skillId": "data-viz",
+          "weight": 4,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "funnel",
+          "weight": 3,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "ab-test",
+          "weight": 2,
+          "target": 3,
+          "type": "plus"
+        },
+        {
+          "skillId": "analysis-report",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "biz-insight",
+          "weight": 1,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "requirement-analysis",
+          "weight": 3,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "communication",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        },
+        {
+          "skillId": "presentation",
+          "weight": 1,
+          "target": 2,
+          "type": "plus"
+        },
+        {
+          "skillId": "teamwork",
+          "weight": 2,
+          "target": 3,
+          "type": "core"
+        }
+      ],
+      "scoringScope": "基础匹配度仅取 type=core 的 requirement；type=plus 只用于「额外优势」展示。"
+    }
+  ]
+}

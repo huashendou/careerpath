@@ -1,0 +1,1054 @@
+{
+  "meta": {
+    "name": "职能雷达 · 技能词典",
+    "version": "v0.1",
+    "updatedAt": "2026-11-15",
+    "disclaimer": "示例数据 v0.1：技能项、维度归属与同义词依据公开招聘信息的常见表述归纳整理，非任何企业官方标准，仅用于产品演示与后续真实 JD 校准的基线。",
+    "schemaNote": "1) 每个技能只属于一个维度（dim），避免雷达图重复计数；2) aliases 用于简历文本解析，匹配时须按长度倒序优先，防止 java 命中 javascript；3) 维度分不由技能数量决定：雷达图按岗位要求聚合，只用 type=core 的要求做加权平均，口径见 jobs.json 的 scoring.radar，不用本文件的技能清单直接平均；4) react 仅作为前端岗 vue 要求的 anyOf 成员参与计分，不是独立岗位要求。",
+    "levelNote": "0-5 级采用行为锚定，锚点描述「你实际做到过什么」，而非「你觉得你多熟练」。自评时以最高一档能拿出证据的级别为准。",
+    "aliasNote": "同义词已做去歧义处理：中文别名不得是其他技能别名的子串；英文/缩写别名解析时必须按「长度倒序 + 词边界」匹配，否则 java 会命中 javascript、sql 会命中 mysql。",
+    "revision": "r2",
+    "revisionNote": "r2（2026-11-15）：仅改 schemaNote 第 3、4 条以对齐 core-only 计分口径。61 项技能、维度、等级、别名一律未改动。"
+  },
+  "dimensions": [
+    {
+      "id": "foundation",
+      "name": "编程基础",
+      "short": "基础",
+      "desc": "语言语法、数据结构与算法、计算机基础。决定你学新技术的速度上限。",
+      "why": "面试第一关，也是判断「能不能自己啃下新技术」的依据。"
+    },
+    {
+      "id": "stack",
+      "name": "岗位技术栈",
+      "short": "技术栈",
+      "desc": "该岗位主流框架、库与工具链的熟练程度。",
+      "why": "决定入职后能不能直接上手干活，是岗位之间差异最大的维度。"
+    },
+    {
+      "id": "engineering",
+      "name": "工程实践",
+      "short": "工程",
+      "desc": "版本控制、测试、调试、部署、性能与安全。决定代码能不能上生产。",
+      "why": "校招最常见的差距项：会写功能，但不会交付可维护的东西。"
+    },
+    {
+      "id": "data",
+      "name": "数据与存储",
+      "short": "数据",
+      "desc": "SQL、数据库、数据建模、数据获取与清洗。",
+      "why": "三个岗位都要读数据，只是深度不同。"
+    },
+    {
+      "id": "insight",
+      "name": "分析与洞察",
+      "short": "洞察",
+      "desc": "统计方法、指标体系、可视化表达，从数据得出结论的能力。",
+      "why": "区分「会取数」与「能给出结论」的分水岭，数据分析师的核心。"
+    },
+    {
+      "id": "delivery",
+      "name": "交付与协作",
+      "short": "协作",
+      "desc": "需求理解、文档撰写、沟通表达、项目推进与自主学习。",
+      "why": "技术能力相近时，最终决定录用的是这一维。"
+    }
+  ],
+  "levels": [
+    {
+      "level": 0,
+      "label": "未接触",
+      "anchor": "没学过，也说不清它解决什么问题。",
+      "typical": "简历上不该出现这个词。"
+    },
+    {
+      "level": 1,
+      "label": "听过概念",
+      "anchor": "看过教程或文档，能解释它是什么，但没动过手。",
+      "typical": "上过课、看过视频，写过 hello world 级别代码。"
+    },
+    {
+      "level": 2,
+      "label": "跟做完成",
+      "anchor": "跟着教程或模板完整做过一遍，脱离教程要频繁查资料。",
+      "typical": "做过课程作业、跟练项目，能跑通但说不清原理。"
+    },
+    {
+      "level": 3,
+      "label": "独立完成",
+      "anchor": "不靠教程独立做出完整模块或项目，能自己排查常见报错。",
+      "typical": "课程设计、个人项目、竞赛作品的主要实现者。"
+    },
+    {
+      "level": 4,
+      "label": "工程实践",
+      "anchor": "在实习或多人协作的真实项目里用过，处理过边界情况、性能或线上问题。",
+      "typical": "实习中负责过模块，代码被别人 review 并用到线上。"
+    },
+    {
+      "level": 5,
+      "label": "精通可教",
+      "anchor": "能设计方案取舍、优化性能、指导他人，踩过深坑并有系统总结。",
+      "typical": "能在这个点上做技术选型、写团队规范、带新人。"
+    }
+  ],
+  "skills": [
+    {
+      "id": "js-core",
+      "name": "JavaScript 核心语法",
+      "dim": "foundation",
+      "group": "语言基础",
+      "aliases": [
+        "js",
+        "javascript",
+        "es6",
+        "es2015",
+        "ecmascript",
+        "promise",
+        "异步编程",
+        "闭包",
+        "原型链"
+      ],
+      "note": "作用域、原型、this、异步（Promise/async）、模块化。前端一切的地基。"
+    },
+    {
+      "id": "ts-type",
+      "name": "TypeScript 类型系统",
+      "dim": "foundation",
+      "group": "语言基础",
+      "aliases": [
+        "ts",
+        "typescript",
+        "类型体操",
+        "interface",
+        "类型推断"
+      ],
+      "note": "接口/泛型/联合类型/类型收窄。能在团队项目里用 TS 约束数据流。"
+    },
+    {
+      "id": "html-css",
+      "name": "HTML 与 CSS 布局",
+      "dim": "foundation",
+      "group": "前端基础",
+      "aliases": [
+        "html",
+        "html5",
+        "css",
+        "css3",
+        "flex",
+        "grid",
+        "盒模型",
+        "布局",
+        "语义化"
+      ],
+      "note": "盒模型、flex/grid、层叠与优先级、语义化标签。"
+    },
+    {
+      "id": "java-basic",
+      "name": "Java 语法与集合框架",
+      "dim": "foundation",
+      "group": "语言基础",
+      "aliases": [
+        "java",
+        "集合框架",
+        "arraylist",
+        "hashmap",
+        "泛型",
+        "stream",
+        "lambda"
+      ],
+      "note": "面向对象、集合体系、泛型、异常、Stream API。"
+    },
+    {
+      "id": "java-concurrency",
+      "name": "Java 并发编程",
+      "dim": "foundation",
+      "group": "语言进阶",
+      "aliases": [
+        "多线程",
+        "线程池",
+        "synchronized",
+        "juc",
+        "concurrenthashmap",
+        "并发"
+      ],
+      "note": "线程生命周期、锁机制、线程池参数、并发容器。后端面试高频。"
+    },
+    {
+      "id": "jvm-basic",
+      "name": "JVM 内存模型与垃圾回收",
+      "dim": "foundation",
+      "group": "语言进阶",
+      "aliases": [
+        "jvm",
+        "gc",
+        "垃圾回收",
+        "类加载",
+        "内存模型",
+        "堆内存",
+        "oom"
+      ],
+      "note": "内存分区、GC 算法与收集器、类加载机制、常见 OOM 排查。"
+    },
+    {
+      "id": "python-basic",
+      "name": "Python 语法与常用库",
+      "dim": "foundation",
+      "group": "语言基础",
+      "aliases": [
+        "python",
+        "列表推导",
+        "字典",
+        "装饰器",
+        "生成器"
+      ],
+      "note": "数据结构、函数式写法、异常处理、虚拟环境管理。"
+    },
+    {
+      "id": "ds-algo",
+      "name": "数据结构与算法",
+      "dim": "foundation",
+      "group": "计算机基础",
+      "aliases": [
+        "算法",
+        "数据结构",
+        "链表",
+        "二叉树",
+        "哈希表",
+        "排序",
+        "动态规划",
+        "leetcode",
+        "刷题"
+      ],
+      "note": "数组/链表/树/图/哈希，排序与查找，复杂度分析。笔试硬通货。"
+    },
+    {
+      "id": "oop-design",
+      "name": "面向对象与设计模式",
+      "dim": "foundation",
+      "group": "编程思想",
+      "aliases": [
+        "设计模式",
+        "oop",
+        "面向对象",
+        "工厂模式",
+        "单例",
+        "观察者模式",
+        "单一职责",
+        "开闭原则"
+      ],
+      "note": "封装继承多态的实际运用，常见模式的适用场景与误用。"
+    },
+    {
+      "id": "network-basic",
+      "name": "计算机网络基础",
+      "dim": "foundation",
+      "group": "计算机基础",
+      "aliases": [
+        "tcp",
+        "udp",
+        "http",
+        "https",
+        "dns",
+        "三次握手",
+        "网络协议",
+        "跨域"
+      ],
+      "note": "HTTP/HTTPS、TCP 握手与拥塞、DNS 解析、跨域与同源策略。"
+    },
+    {
+      "id": "os-basic",
+      "name": "操作系统基础",
+      "dim": "foundation",
+      "group": "计算机基础",
+      "aliases": [
+        "操作系统",
+        "进程",
+        "内存管理",
+        "死锁",
+        "文件系统",
+        "页表"
+      ],
+      "note": "进程与线程、内存管理、IO 模型、死锁。后端与面试重点。"
+    },
+    {
+      "id": "browser-basic",
+      "name": "浏览器工作原理",
+      "dim": "foundation",
+      "group": "前端基础",
+      "aliases": [
+        "浏览器原理",
+        "渲染流程",
+        "重排",
+        "重绘",
+        "事件循环",
+        "event loop",
+        "浏览器缓存",
+        "dom",
+        "bom"
+      ],
+      "note": "解析与渲染流程、事件循环、重排重绘、浏览器缓存与存储。"
+    },
+    {
+      "id": "regex",
+      "name": "正则表达式",
+      "dim": "foundation",
+      "group": "工具基础",
+      "aliases": [
+        "正则",
+        "regexp",
+        "regex",
+        "匹配规则",
+        "贪婪匹配"
+      ],
+      "note": "元字符、分组、断言。文本清洗与日志提取的基本功。"
+    },
+    {
+      "id": "vue",
+      "name": "Vue 框架",
+      "dim": "stack",
+      "group": "前端框架",
+      "aliases": [
+        "vue",
+        "vue2",
+        "vue3",
+        "vuex",
+        "pinia",
+        "组合式api",
+        "composition api",
+        "nuxt"
+      ],
+      "note": "响应式原理、组件通信、生命周期、路由。前端岗主流选择之一。"
+    },
+    {
+      "id": "react",
+      "name": "React 框架",
+      "dim": "stack",
+      "group": "前端框架",
+      "aliases": [
+        "react",
+        "reactjs",
+        "hooks",
+        "jsx",
+        "redux",
+        "函数组件",
+        "next.js",
+        "nextjs"
+      ],
+      "note": "JSX、Hooks、状态提升、虚拟 DOM 与渲染优化。"
+    },
+    {
+      "id": "component-design",
+      "name": "组件化与状态管理",
+      "dim": "stack",
+      "group": "前端框架",
+      "aliases": [
+        "组件化",
+        "组件拆分",
+        "组件封装",
+        "状态管理",
+        "组件通信",
+        "复用"
+      ],
+      "note": "按职责拆组件、受控/非受控、跨层状态方案选型。区分「会用框架」和「会设计前端」。"
+    },
+    {
+      "id": "css-toolchain",
+      "name": "CSS 预处理器与组件库",
+      "dim": "stack",
+      "group": "前端工具",
+      "aliases": [
+        "sass",
+        "scss",
+        "less",
+        "tailwind",
+        "element-ui",
+        "element plus",
+        "antd",
+        "ant design",
+        "组件库"
+      ],
+      "note": "Sass/Less 变量与嵌套、Tailwind 原子化、UI 库的二次封装与主题定制。"
+    },
+    {
+      "id": "frontend-build",
+      "name": "前端构建与工程化工具",
+      "dim": "stack",
+      "group": "前端工具",
+      "aliases": [
+        "webpack",
+        "vite",
+        "rollup",
+        "babel",
+        "打包",
+        "构建工具",
+        "工程化",
+        "esbuild"
+      ],
+      "note": "模块打包、loader/plugin、按需加载、环境变量与构建产物分析。"
+    },
+    {
+      "id": "responsive-mobile",
+      "name": "响应式与移动端适配",
+      "dim": "stack",
+      "group": "前端工具",
+      "aliases": [
+        "响应式",
+        "移动端适配",
+        "rem",
+        "vw",
+        "媒体查询",
+        "h5",
+        "移动端",
+        "跨端"
+      ],
+      "note": "多端适配方案、rem/vw 换算、常见移动端兼容坑。"
+    },
+    {
+      "id": "node-runtime",
+      "name": "Node.js 与 npm 生态",
+      "dim": "stack",
+      "group": "前端工具",
+      "aliases": [
+        "node",
+        "nodejs",
+        "npm",
+        "pnpm",
+        "yarn",
+        "包管理",
+        "express",
+        "中间层"
+      ],
+      "note": "包管理与依赖锁定、脚本配置、能用 Node 写工具或接口。"
+    },
+    {
+      "id": "mini-program",
+      "name": "小程序开发",
+      "dim": "stack",
+      "group": "前端框架",
+      "aliases": [
+        "小程序",
+        "微信小程序",
+        "taro",
+        "uniapp",
+        "uni-app",
+        "wxml"
+      ],
+      "note": "小程序生命周期、原生组件限制、跨端框架差异。校招加分项。"
+    },
+    {
+      "id": "spring-boot",
+      "name": "Spring / Spring Boot",
+      "dim": "stack",
+      "group": "Java 框架",
+      "aliases": [
+        "spring",
+        "springboot",
+        "spring boot",
+        "spring mvc",
+        "ioc",
+        "aop",
+        "注解",
+        "拦截器"
+      ],
+      "note": "IoC/AOP、自动装配、MVC 分层、全局异常与拦截器。后端岗核心。"
+    },
+    {
+      "id": "orm-framework",
+      "name": "MyBatis 与持久层框架",
+      "dim": "stack",
+      "group": "Java 框架",
+      "aliases": [
+        "mybatis",
+        "mybatis-plus",
+        "hibernate",
+        "jpa",
+        "orm",
+        "持久层",
+        "mapper",
+        "sql 映射"
+      ],
+      "note": "SQL 映射、动态 SQL、一级二级缓存、与数据库的边界。"
+    },
+    {
+      "id": "build-tool-java",
+      "name": "Maven / Gradle 构建",
+      "dim": "stack",
+      "group": "Java 工具",
+      "aliases": [
+        "maven",
+        "gradle",
+        "pom",
+        "依赖管理",
+        "多模块"
+      ],
+      "note": "依赖冲突排查、多模块聚合、profile 与环境隔离。"
+    },
+    {
+      "id": "spring-cloud",
+      "name": "微服务与 Spring Cloud",
+      "dim": "stack",
+      "group": "Java 框架",
+      "aliases": [
+        "微服务",
+        "spring cloud",
+        "springcloud",
+        "nacos",
+        "eureka",
+        "网关",
+        "服务注册",
+        "feign",
+        "熔断"
+      ],
+      "note": "服务拆分边界、注册发现、网关、熔断限流。校招多为概念级要求。"
+    },
+    {
+      "id": "mq",
+      "name": "消息队列",
+      "dim": "stack",
+      "group": "Java 中间件",
+      "aliases": [
+        "消息队列",
+        "kafka",
+        "rocketmq",
+        "rabbitmq",
+        "mq",
+        "削峰",
+        "异步解耦"
+      ],
+      "note": "异步解耦、削峰、消息可靠性、积压与重复消费处理。"
+    },
+    {
+      "id": "excel",
+      "name": "Excel 数据分析",
+      "dim": "stack",
+      "group": "分析工具",
+      "aliases": [
+        "excel",
+        "透视表",
+        "数据透视",
+        "vlookup",
+        "xlookup",
+        "表格处理"
+      ],
+      "note": "数据透视、查找函数、条件格式。分析师日常最常用的工具，最不该缺。"
+    },
+    {
+      "id": "pandas",
+      "name": "pandas / NumPy 数据处理",
+      "dim": "stack",
+      "group": "分析工具",
+      "aliases": [
+        "pandas",
+        "numpy",
+        "dataframe",
+        "数据框",
+        "groupby",
+        "数据表操作"
+      ],
+      "note": "DataFrame 增删改查、分组聚合、表连接、向量化计算。"
+    },
+    {
+      "id": "bi-tool",
+      "name": "BI 工具",
+      "dim": "stack",
+      "group": "分析工具",
+      "aliases": [
+        "tableau",
+        "power bi",
+        "powerbi",
+        "帆软",
+        "finebi",
+        "superset",
+        "看板搭建"
+      ],
+      "note": "数据集建模、图表搭建、看板交付与权限分享。"
+    },
+    {
+      "id": "ml-basic",
+      "name": "机器学习基础",
+      "dim": "stack",
+      "group": "分析进阶",
+      "aliases": [
+        "机器学习",
+        "回归",
+        "分类",
+        "聚类",
+        "sklearn",
+        "scikit-learn",
+        "模型训练",
+        "特征工程"
+      ],
+      "note": "常见算法适用场景、特征处理、模型评估指标。分析师加分项。"
+    },
+    {
+      "id": "git",
+      "name": "Git 版本控制",
+      "dim": "engineering",
+      "group": "研发流程",
+      "aliases": [
+        "git",
+        "github",
+        "gitlab",
+        "gitee",
+        "分支管理",
+        "commit",
+        "merge",
+        "rebase",
+        "版本控制"
+      ],
+      "note": "分支策略、冲突解决、提交规范、回溯与撤销。最基础的团队协作门槛。"
+    },
+    {
+      "id": "unit-test",
+      "name": "单元测试",
+      "dim": "engineering",
+      "group": "质量保障",
+      "aliases": [
+        "单元测试",
+        "单测",
+        "junit",
+        "jest",
+        "vitest",
+        "pytest",
+        "断言",
+        "测试用例",
+        "覆盖率"
+      ],
+      "note": "用例设计、边界与异常覆盖、Mock 依赖。"
+    },
+    {
+      "id": "debug",
+      "name": "调试与问题排查",
+      "dim": "engineering",
+      "group": "质量保障",
+      "aliases": [
+        "调试",
+        "debug",
+        "断点",
+        "排错",
+        "问题定位",
+        "抓包"
+      ],
+      "note": "断点与调用栈、抓包、二分定位、复现路径还原。比会写代码更稀缺。"
+    },
+    {
+      "id": "code-review",
+      "name": "代码规范与评审",
+      "dim": "engineering",
+      "group": "质量保障",
+      "aliases": [
+        "代码规范",
+        "code review",
+        "eslint",
+        "checkstyle",
+        "重构"
+      ],
+      "note": "命名与分层、静态检查工具、可读性优化、评审意见的表达。"
+    },
+    {
+      "id": "linux",
+      "name": "Linux 常用操作",
+      "dim": "engineering",
+      "group": "环境部署",
+      "aliases": [
+        "linux",
+        "命令行",
+        "服务器",
+        "vim",
+        "centos",
+        "ubuntu",
+        "权限"
+      ],
+      "note": "文件与权限、进程管理、日志查看、服务启停。"
+    },
+    {
+      "id": "docker",
+      "name": "Docker 容器化",
+      "dim": "engineering",
+      "group": "环境部署",
+      "aliases": [
+        "docker",
+        "容器",
+        "镜像",
+        "dockerfile",
+        "kubernetes",
+        "k8s",
+        "docker compose"
+      ],
+      "note": "镜像构建、容器编排、环境一致性。已从加分项变成常见要求。"
+    },
+    {
+      "id": "perf-opt",
+      "name": "性能分析与优化",
+      "dim": "engineering",
+      "group": "质量保障",
+      "aliases": [
+        "性能优化",
+        "首屏优化",
+        "压测",
+        "jmeter",
+        "性能分析",
+        "耗时分析"
+      ],
+      "note": "找到瓶颈、量化改进、验证效果。会优化的人永远比会写的人少。"
+    },
+    {
+      "id": "security-basic",
+      "name": "安全基础",
+      "dim": "engineering",
+      "group": "质量保障",
+      "aliases": [
+        "xss",
+        "csrf",
+        "sql注入",
+        "鉴权",
+        "越权",
+        "加密",
+        "https证书",
+        "安全"
+      ],
+      "note": "常见漏洞成因与防护、鉴权与权限边界。出事故代价最高的一块。"
+    },
+    {
+      "id": "api-integration",
+      "name": "接口联调与第三方对接",
+      "dim": "engineering",
+      "group": "研发流程",
+      "aliases": [
+        "联调",
+        "接口对接",
+        "第三方接口",
+        "postman",
+        "restful",
+        "openapi",
+        "回调"
+      ],
+      "note": "前后端契约、错误码约定、超时重试与幂等、第三方 SDK 接入。"
+    },
+    {
+      "id": "sql-query",
+      "name": "SQL 查询与多表关联",
+      "dim": "data",
+      "group": "数据库",
+      "aliases": [
+        "sql",
+        "join",
+        "多表关联",
+        "子查询",
+        "group by",
+        "窗口函数",
+        "having"
+      ],
+      "note": "多表 join、聚合、子查询、窗口函数。三个岗位的共同底线。"
+    },
+    {
+      "id": "sql-optimize",
+      "name": "SQL 优化与索引",
+      "dim": "data",
+      "group": "数据库",
+      "aliases": [
+        "索引",
+        "执行计划",
+        "explain",
+        "慢查询",
+        "sql优化",
+        "索引失效"
+      ],
+      "note": "看执行计划、索引设计、避免全表扫描与大表 join。"
+    },
+    {
+      "id": "db-mysql",
+      "name": "MySQL 事务与锁",
+      "dim": "data",
+      "group": "数据库",
+      "aliases": [
+        "mysql",
+        "事务",
+        "隔离级别",
+        "行锁",
+        "幻读",
+        "innodb",
+        "mvcc"
+      ],
+      "note": "ACID、隔离级别与现象、锁的类型、MVCC。后端面试必考。"
+    },
+    {
+      "id": "db-design",
+      "name": "表结构设计",
+      "dim": "data",
+      "group": "数据建模",
+      "aliases": [
+        "建表",
+        "范式",
+        "字段设计",
+        "er图",
+        "数据库设计"
+      ],
+      "note": "按业务抽象表、字段类型与索引规划、范式与反范式的取舍。"
+    },
+    {
+      "id": "redis",
+      "name": "Redis 缓存",
+      "dim": "data",
+      "group": "缓存与存储",
+      "aliases": [
+        "redis",
+        "缓存穿透",
+        "缓存雪崩",
+        "分布式缓存",
+        "分布式锁",
+        "过期策略"
+      ],
+      "note": "数据类型选型、缓存一致性、穿透雪崩、分布式锁。"
+    },
+    {
+      "id": "dw-model",
+      "name": "数据仓库与维度建模",
+      "dim": "data",
+      "group": "数据建模",
+      "aliases": [
+        "数仓",
+        "数据仓库",
+        "维度建模",
+        "星型模型",
+        "雪花模型",
+        "ods",
+        "dws"
+      ],
+      "note": "分层架构、事实表与维度表、宽表设计、指标可复用性。"
+    },
+    {
+      "id": "data-clean",
+      "name": "数据清洗与预处理",
+      "dim": "data",
+      "group": "数据处理",
+      "aliases": [
+        "数据清洗",
+        "缺失值",
+        "异常值",
+        "去重",
+        "预处理",
+        "数据规范"
+      ],
+      "note": "缺失与异常处理、口径统一、脏数据溯源。"
+    },
+    {
+      "id": "data-collect",
+      "name": "数据采集与埋点",
+      "dim": "data",
+      "group": "数据处理",
+      "aliases": [
+        "埋点",
+        "数据采集",
+        "爬虫",
+        "数据源",
+        "sdk 埋点"
+      ],
+      "note": "埋点方案设计、事件与属性定义、采集口径一致性。"
+    },
+    {
+      "id": "data-quality",
+      "name": "数据质量校验",
+      "dim": "data",
+      "group": "数据治理",
+      "aliases": [
+        "数据质量",
+        "校验",
+        "一致性",
+        "数据核对",
+        "对账"
+      ],
+      "note": "完整性/准确性/及时性校验，口径文档化，问题回溯。"
+    },
+    {
+      "id": "stats-basic",
+      "name": "统计学基础",
+      "dim": "insight",
+      "group": "分析方法",
+      "aliases": [
+        "统计学",
+        "统计",
+        "假设检验",
+        "置信区间",
+        "显著性",
+        "方差",
+        "抽样",
+        "p值"
+      ],
+      "note": "描述统计、抽样与偏差、假设检验、相关与因果的区别。"
+    },
+    {
+      "id": "ab-test",
+      "name": "A/B 测试与实验设计",
+      "dim": "insight",
+      "group": "分析方法",
+      "aliases": [
+        "ab测试",
+        "a/b测试",
+        "实验设计",
+        "分流",
+        "灰度实验"
+      ],
+      "note": "假设设定、样本量估算、分流与干扰、结果解读与陷阱。"
+    },
+    {
+      "id": "metrics",
+      "name": "指标体系设计",
+      "dim": "insight",
+      "group": "分析方法",
+      "aliases": [
+        "指标",
+        "指标体系",
+        "kpi",
+        "北极星指标",
+        "口径定义",
+        "opm"
+      ],
+      "note": "从业务目标拆到可计算指标，定义口径与拆解层级。"
+    },
+    {
+      "id": "funnel",
+      "name": "漏斗与用户行为分析",
+      "dim": "insight",
+      "group": "分析方法",
+      "aliases": [
+        "漏斗",
+        "转化率",
+        "行为分析",
+        "路径分析",
+        "流失"
+      ],
+      "note": "漏斗拆解、转化定位、行为路径与流失归因。"
+    },
+    {
+      "id": "data-viz",
+      "name": "数据可视化表达",
+      "dim": "insight",
+      "group": "表达呈现",
+      "aliases": [
+        "可视化",
+        "图表设计",
+        "dashboard",
+        "数据大屏",
+        "图表选型"
+      ],
+      "note": "按数据关系选图、减少误导性表达、一页说清一件事。"
+    },
+    {
+      "id": "analysis-report",
+      "name": "分析报告撰写",
+      "dim": "insight",
+      "group": "表达呈现",
+      "aliases": [
+        "分析报告",
+        "结论",
+        "建议",
+        "数据分析报告",
+        "周报",
+        "复盘"
+      ],
+      "note": "结论先行、证据链完整、建议可执行而非「加强优化」。"
+    },
+    {
+      "id": "biz-insight",
+      "name": "业务问题拆解",
+      "dim": "insight",
+      "group": "分析思维",
+      "aliases": [
+        "业务分析",
+        "问题拆解",
+        "假设驱动",
+        "业务理解",
+        "结构化解题"
+      ],
+      "note": "把一个模糊的业务问题拆成可验证的假设与可测的指标。"
+    },
+    {
+      "id": "requirement-analysis",
+      "name": "需求理解与拆解",
+      "dim": "delivery",
+      "group": "协作",
+      "aliases": [
+        "需求分析",
+        "需求评审",
+        "需求拆解",
+        "prd",
+        "用户故事",
+        "验收标准"
+      ],
+      "note": "从模糊需求里问出边界、异常与验收标准。"
+    },
+    {
+      "id": "tech-doc",
+      "name": "技术文档撰写",
+      "dim": "delivery",
+      "group": "协作",
+      "aliases": [
+        "技术方案",
+        "readme",
+        "接口文档",
+        "设计文档",
+        "wiki"
+      ],
+      "note": "方案文档说清取舍、接口文档说清契约、README 说清怎么跑。"
+    },
+    {
+      "id": "communication",
+      "name": "跨角色沟通表达",
+      "dim": "delivery",
+      "group": "协作",
+      "aliases": [
+        "沟通",
+        "表达",
+        "跨部门",
+        "对齐",
+        "表达清晰"
+      ],
+      "note": "跟产品/设计/测试对齐预期，把技术问题讲给非技术的人听。"
+    },
+    {
+      "id": "teamwork",
+      "name": "团队协作与推进",
+      "dim": "delivery",
+      "group": "协作",
+      "aliases": [
+        "团队协作",
+        "推进",
+        "项目管理",
+        "协同"
+      ],
+      "note": "分工与交接、主动同步进度、卡点及时暴露。"
+    },
+    {
+      "id": "project-delivery",
+      "name": "完整项目交付经验",
+      "dim": "delivery",
+      "group": "交付",
+      "aliases": [
+        "项目经验",
+        "上线",
+        "交付",
+        "完整项目",
+        "从 0 到 1",
+        "实习项目"
+      ],
+      "note": "完整走过需求→开发→测试→上线→复盘，哪怕规模很小。"
+    },
+    {
+      "id": "presentation",
+      "name": "汇报与演示",
+      "dim": "delivery",
+      "group": "协作",
+      "aliases": [
+        "汇报",
+        "ppt",
+        "演示",
+        "答辩",
+        "演讲",
+        "述职"
+      ],
+      "note": "结论先行、控制节奏、被追问时能兜住。"
+    }
+  ]
+}
