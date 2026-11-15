@@ -2,6 +2,12 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import http, { TOKEN_KEY } from '../api/client'
 
+/**
+ * 登录态。
+ *
+ * T0 只落骨架：接口 404/401 时不会崩，但也不会假装登录成功。
+ * T1 接 /api/auth/register|login|me 后即可用。
+ */
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem(TOKEN_KEY) || '')
   const user = ref(null)
