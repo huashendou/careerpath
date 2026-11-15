@@ -158,6 +158,10 @@
   - 前端 `npm run build` 通过，分包实测 element-plus 968 kB / vendor 305.5 kB / 入口 6.4 kB。
   - 自检修正四处：`EMPTY_PROFILE` 时 `bonusScore` 原为 `0.0`（改为 `null`）；`dev-up.sh` 探测漏内部令牌；T0 快照中混入 T1 前端（auth store 与路由守卫，已剥离）；`schema.sql` 库 collation 与库内 15 表不一致（已对齐 `utf8mb4_0900_ai_ci`）。
 - 🅿️ **T1 旧代码存于 `wip/t1-trae-1950`**（4 笔：`94615bb`/`8504733`/`8c29aa6`/`7e272c7`）。19:37–19:53 期间由评审侧在工作区实现并提交，与单写者原则及 6.0 闸门冲突；`dev` 保持 T0 快照，历史与作者未改动。
-- 🟡 **T1 进行中**（2026-11-15 20:26 开工）：按 T0-R 遗留建议第 6 条，**不以 `git merge` 接回**，改为逐笔接管——只取 `backend-java` 的 auth / profile / stats / user 四个包、两个测试类与前端四处改动，逐个复核后由实现方重新提交；文档一律不取（含把实现方与评审方写反的 `docs/评审记录.md`）。
-- ⬜ T3–T6 未开始；T1-R 通过后开 T3。
+- 🟡 **T1 待评审**（2026-11-15 20:47 自检完成）：按 T0-R 遗留建议第 6 条，**不以 `git merge` 接回**，改为逐笔接管——只取 `backend-java` 的 auth / profile / stats / user 四个包、两个测试类与前端四处改动，逐个复核后由实现方重新提交；文档一律不取（含把实现方与评审方写反的 `docs/评审记录.md`）。
+  - 已交付：`/api/auth/register|login|me`、`/api/profile`(GET/PUT)、`/api/stats/overview`、前端登录/档案/概览三页与 `AUTH_ENFORCED` 路由守卫；`user.role` 默认值改小写对齐契约。
+  - 自检证据（`docs/T1-自检报告.md`）：接口 16 项断言全通过；Java 测试 10 → **14** 项（新增 `StatsControllerTest`）；守卫用无头 Edge 实测无令牌/有效令牌/伪造令牌三种情形。
+  - 自检修掉 1 个缺陷（`72b9c0d`）：`profileCompleted` 原判「`user_profile` 有行」，只填手机号也显示「已完善」，改为「学校与专业均非空」，反向验证已复现旧行为。
+  - 库里测试账号已清空（`user` 0 行），种子 61 技能 / 6 分类未变；jar 已重打含该修复。
+- ⬜ T3–T6 未开始；**T1-R 通过后开 T3**。
 
