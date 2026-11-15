@@ -29,9 +29,16 @@ public class StatsService {
 
     @Transactional(readOnly = true)
     public OverviewResponse overview(Long userId) {
-        Boolean hasProfile = jdbc.queryForObject(
-                "SELECT COUNT(*) > 0 FROM user_profile WHERE user_id = ?", Boolean.class, userId);
-        boolean profileCompleted = Boolean.TRUE.equals(hasProfile);
+        // 「档案完善」不能只判「有没有这一行」：PUT 是整体替换，用户只填手机号也会落一行，
+        // 那时前端会显示「已完善 / 学校专业已记录」，与事实不符。按学校与专业都非空来判，
+        // 与概览页的提示文案（学校专业已记录）对齐。
+        Boolean profileCompletedRow = jdbc.queryForObject("""
+                SELECT COUNT(*) > 0 FROM user_profile
+                 WHERE user_id = ?
+                   AND school IS NOT NULL AND TRIM(school) <> ''
+                   AND major  IS NOT NULL AND TRIM(major)  <> ''
+                """, Boolean.class, userId);
+        boolean profileCompleted = Boolean.TRUE.equals(profileCompletedRow);
 
         int jobCount = count("SELECT COUNT(*) FROM job_position WHERE user_id = ?", userId);
         int taskOpenCount = count(
