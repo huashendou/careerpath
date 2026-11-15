@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS job_skill_requirement (
   req_type        VARCHAR(16) NOT NULL COMMENT 'required / bonus，分开算分，不合并',
   weight          INT         NOT NULL DEFAULT 1,
   target_level    TINYINT     NOT NULL COMMENT '1–5',
+  any_of          JSON        DEFAULT NULL COMMENT '可替代技能 id 数组，如 ["react"]；AGENTS 七要求 anyOf 取高者计分，故必须可持久化',
   evidence_hint   VARCHAR(255) DEFAULT NULL COMMENT 'JD 原文里对应的句子片段',
   source_span     VARCHAR(64) DEFAULT NULL COMMENT '原文偏移，形如 12:24',
   PRIMARY KEY (id),

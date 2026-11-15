@@ -44,7 +44,7 @@
 
 | 层 | 选型 | 说明 |
 |---|---|---|
-| 前端 | Vue 3 + Vite + Element Plus + Pinia + Axios + ECharts | 9 个页面；`/api` 代理到 Java |
+| 前端 | Vue 3 + Vite + Element Plus + Pinia + Axios + ECharts | 7 个页面（登录 / 概览 / 岗位解析 / 技能图谱 / 技能画像 / 岗位匹配 / 学习计划）；`/api` 代理到 Java |
 | 业务后端 | Java 25 + Spring Boot **3.5.16** + MyBatis-Plus **3.5.18.1** + Spring Security + JWT | 端口 8080，前缀 `/api`；Maven **3.9.16**，已配阿里云镜像 |
 | 智能分析服务 | Python + FastAPI + Pandas + NumPy | 端口 8000，前缀 `/internal`；共享密钥校验；**不对外** |
 | 数据库 | MySQL（库名 `career_path`，utf8mb4） | **15 张表**，见 `docs/P0-重构方案.md` 第四节（模块 2/8 的表已裁掉） |
@@ -140,7 +140,11 @@
 - ✅ 需求基线确认：按《整体介绍》重建，项目名「职航 CareerPath」，路线 A（Java + Python 双服务），**范围裁为模块 1/3/4/5/6/7**。
 - ✅ 重构蓝图：`docs/P0-重构方案.md`，15 张表、7 个页面、T0–T6。
 - ✅ 环境就绪：JDK 25.0.2、Maven 3.9.16（用户 PATH）、`~/.m2/settings.xml` 阿里云镜像；Spring Boot 3.5.16 + MyBatis-Plus 3.5.18.1 已锁定。
-- 🟡 `analysis-service/`：Trae 留下的骨架可运行（`/internal/health`、`/internal/parse/jd`），**但算分能力 `matching.py` 被删**，需从 `ac5c431` 恢复并改造成 `/internal/match`。
-- 🟡 `backend-java/`：只有 `pom.xml`，无源码。
-- ⬜ `frontend/`：仍是 v1 的四页面（直连 Python 8000），需按 Element Plus + `/api` 代理 8080 重写。
-- ⬜ T0–T6 未开始，T0 进行中。
+- 🟡 **T0 已交付，待 Trae 评审**（2026-11-15）：
+  - `backend-java/`：Spring Boot 3.5.16 + MyBatis-Plus 3.5.18.1 + Security/JWT 骨架，包名 `com.careerpath`，`GET /api/health`（含 DB 与分析服务双探活），统一错误体与 `X-Trace-Id`，启动幂等导入 61 技能 / 6 类。
+  - `analysis-service/`：`/internal/health`、`/internal/parse/jd`、`/internal/match` 三个内部接口，共享密钥校验；算分按 required-only 口径（证据不进分数），83 项 pytest 全绿。
+  - 数据库：`career_path`（utf8mb4），**15 张表**，`scripts/init_db.py` 幂等建库。
+  - `frontend/`：Vue 3 + Element Plus，9 → **7 个页面**路由骨架，`/api` 代理 8080。
+  - `scripts/dev-up.sh` / `dev-down.sh`：三进程一键起停，实测两个 health 均 200。
+- ⬜ T1–T6 未开始；按 6.0 评审闸门，T0-R 通过后才开 T1。
+
