@@ -13,7 +13,7 @@
 4. **anyOf 只计一次**：Vue / React 二选一，取高者，权重只加一次；缺口也只出一条。
 5. **空维返回 None，不返回 0**：某维度没有 required 要求时，0 会被读成「要求为零」，
    真实含义是「本岗位不把它当核心要求」。
-6. **无法算分不抛异常**：返回 `matchScore=None` + `status`，这是业务结论不是错误。
+6. **无法算分不抛异常**：返回 `requiredScore=None` + `status`，这是业务结论不是错误。
 
 公式：`requiredScore = Σ_req(W×min(L,T)) / Σ_req(W×T) × 100`
 与《整体介绍》`Σ(W×Mi)/ΣW`（`Mi` 为归一化掌握度）数学等价，此处选分母写法是为了
@@ -46,7 +46,7 @@ STATUS_WEAK = "weak"
 STATUS_MASTERED = "mastered"
 
 OK = "ok"
-NO_CORE_REQUIREMENT = "NO_CORE_REQUIREMENT"
+NO_REQUIRED_REQUIREMENT = "NO_REQUIRED_REQUIREMENT"
 EMPTY_PROFILE = "EMPTY_PROFILE"
 
 BONUS_MASTERED = "mastered"
@@ -344,9 +344,9 @@ def analyze(
     coverage = _evidence_coverage(core, evidence)
 
     # 三种状态的判定顺序有讲究：岗位本身不可算（无 required）比「用户还没自评」更根本，
-    # 换任何画像结论都一样，所以先报 NO_CORE_REQUIREMENT。
+    # 换任何画像结论都一样，所以先报 NO_REQUIRED_REQUIREMENT。
     if denominator == 0:
-        status = NO_CORE_REQUIREMENT
+        status = NO_REQUIRED_REQUIREMENT
         required_score = None
     elif not ratings:
         status = EMPTY_PROFILE
@@ -356,9 +356,13 @@ def analyze(
         required_score = _round(numerator / denominator * 100, "0.0001")
 
     bonus_numerator, bonus_denominator = _totals(bonus, ratings)
+    # 与 requiredScore 同理：用户还没自评时，「加分项拿了 0%」不成立，应给 null。
+    # 只有「自评过、但确实没够上」才是真实结论 0.0（见 test_zero_ratings_is_not_empty_profile）。
+    # 分母为 0 是岗位本身没有加分项，属「不适用」，同样是 null。
+    # 注意 evidenceCoverage 不走这条规则：没有证据本身就是 0%，是可计算的真实结论。
     bonus_score = (
         _round(bonus_numerator / bonus_denominator * 100, "0.0001")
-        if bonus_denominator
+        if bonus_denominator and ratings
         else None
     )
 
@@ -370,7 +374,7 @@ def analyze(
         "jobId": job_id,
         "jobName": job_name,
         "userId": user_id,
-        "matchScore": required_score,
+        "requiredScore": required_score,
         "bonusScore": bonus_score,
         "status": status,
         "numerator": numerator,
@@ -379,17 +383,17 @@ def analyze(
         "bonusDenominator": bonus_denominator,
         "evidenceCoverage": coverage["coverage"],
         "counts": {
-            "mastered": counts[STATUS_MASTERED],
-            "weak": counts[STATUS_WEAK],
-            "missing": counts[STATUS_MISSING],
-            "plusMastered": sum(1 for i in bonus_items if i["status"] == BONUS_MASTERED),
-            "plusPending": sum(1 for i in bonus_items if i["status"] == BONUS_PENDING),
+            "requiredMastered": counts[STATUS_MASTERED],
+            "requiredWeak": counts[STATUS_WEAK],
+            "requiredMissing": counts[STATUS_MISSING],
+            "bonusMastered": sum(1 for i in bonus_items if i["status"] == BONUS_MASTERED),
+            "bonusPending": sum(1 for i in bonus_items if i["status"] == BONUS_PENDING),
             "evidenceCovered": coverage["coveredCount"],
             "requiredTotal": coverage["totalCount"],
         },
         "gaps": gaps,
         "topActions": [g["skillId"] for g in gaps[:3]],
-        "plusItems": bonus_items,
+        "bonusItems": bonus_items,
         "radar": _radar(core, ratings, dimensions, skills),
         "meta": {
             "scoringVersion": scoring_version,

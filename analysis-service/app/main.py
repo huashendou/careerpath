@@ -32,7 +32,7 @@ from app.schemas.internal import (
 )
 from app.services.jd_parser import ALGORITHM_VERSION, parse_jd
 from app.services.matching import ALGORITHM_VERSION as MATCH_ALGORITHM_VERSION
-from app.services.matching import NO_CORE_REQUIREMENT, analyze
+from app.services.matching import NO_REQUIRED_REQUIREMENT, analyze
 
 SERVICE_VERSION = "0.1.0"
 
@@ -202,7 +202,7 @@ def parse_jd_endpoint(payload: ParseJdIn, _: None = Depends(require_internal_tok
 def match_endpoint(payload: MatchIn, _: None = Depends(require_internal_token)) -> MatchOut:
     """**纯计算，不落库**。Java 侧负责取数与保存结果，并记录 `algorithmVersion`。
 
-    证据只影响 `evidenceCoverage` 与 `hasEvidence`，**不改 matchScore**：
+    证据只影响 `evidenceCoverage` 与 `hasEvidence`，**不改 requiredScore**：
     没上传材料就扣分，与「加分项进分母」是同一种错误。
     """
     data = store.get()
@@ -240,13 +240,13 @@ def match_endpoint(payload: MatchIn, _: None = Depends(require_internal_token)) 
         "匹配完成：job=%s status=%s score=%s num/den=%s/%s gaps=%s coverage=%s",
         payload.job_id,
         result["status"],
-        result["matchScore"],
+        result["requiredScore"],
         result["numerator"],
         result["denominator"],
         len(result["gaps"]),
         result["evidenceCoverage"],
     )
-    if result["status"] == NO_CORE_REQUIREMENT:
+    if result["status"] == NO_REQUIRED_REQUIREMENT:
         # 不是错误：这个岗位确实没有必备要求，结论就是「无法算分」。
         logger.warning("岗位无可算分的必备要求：job=%s", payload.job_id)
     return MatchOut.model_validate(result)

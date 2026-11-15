@@ -16,7 +16,7 @@ import pytest
 
 from app.services.matching import (
     EMPTY_PROFILE,
-    NO_CORE_REQUIREMENT,
+    NO_REQUIRED_REQUIREMENT,
     OK,
     analyze,
     clamp_level,
@@ -88,13 +88,13 @@ def test_core_weights_unchanged(jobs_by_id):
 
 def test_all_core_at_five_is_hundred(frontend, skill_index, dim_specs):
     result = run(frontend, uniform(frontend, 5), skill_index, dim_specs)
-    assert result["matchScore"] == 100.0
+    assert result["requiredScore"] == 100.0
     assert result["numerator"] == result["denominator"] == FRONTEND_DEN
 
 
 def test_all_core_at_zero_is_zero(frontend, skill_index, dim_specs):
     result = run(frontend, uniform(frontend, 0), skill_index, dim_specs)
-    assert result["matchScore"] == 0.0
+    assert result["requiredScore"] == 0.0
     assert result["numerator"] == 0
 
 
@@ -102,25 +102,25 @@ def test_target_level_is_full_marks(frontend, skill_index, dim_specs):
     """刚好达到目标等级就是满分，多出来的等级不加分（min(L,T) 封顶）。"""
     exact = {r["skillId"]: r["target"] for r in core_of(frontend)}
     over = {r["skillId"]: 5 for r in core_of(frontend)}
-    assert run(frontend, exact, skill_index, dim_specs)["matchScore"] == 100.0
-    assert run(frontend, over, skill_index, dim_specs)["matchScore"] == 100.0
+    assert run(frontend, exact, skill_index, dim_specs)["requiredScore"] == 100.0
+    assert run(frontend, over, skill_index, dim_specs)["requiredScore"] == 100.0
 
 
 def test_half_level_reference_value(frontend, skill_index, dim_specs):
     """半档（floor(target/2)）= 41.1765%，与看板 3.5 示例数字一致。"""
     result = run(frontend, uniform(frontend), skill_index, dim_specs)
-    assert result["matchScore"] == pytest.approx(41.1765, abs=1e-6)
+    assert result["requiredScore"] == pytest.approx(41.1765, abs=1e-6)
     assert result["numerator"] == 105
 
 
 def test_one_level_reference_value(frontend, skill_index, dim_specs):
     result = run(frontend, uniform(frontend, 1), skill_index, dim_specs)
-    assert result["matchScore"] == pytest.approx(30.9804, abs=1e-6)
+    assert result["requiredScore"] == pytest.approx(30.9804, abs=1e-6)
     assert result["numerator"] == 79
 
 
 def test_score_is_four_decimals(frontend, skill_index, dim_specs):
-    value = run(frontend, uniform(frontend), skill_index, dim_specs)["matchScore"]
+    value = run(frontend, uniform(frontend), skill_index, dim_specs)["requiredScore"]
     assert round(value, 4) == value
 
 
@@ -138,7 +138,7 @@ def test_plus_never_changes_match_score(frontend, skill_index, dim_specs, core_v
     """同 core、plus 全 0 与全 5 的 M_core 必须完全相等。"""
     low = run(frontend, _with_plus(frontend, core_value, 0), skill_index, dim_specs)
     high = run(frontend, _with_plus(frontend, core_value, 5), skill_index, dim_specs)
-    assert low["matchScore"] == high["matchScore"]
+    assert low["requiredScore"] == high["requiredScore"]
     assert low["numerator"] == high["numerator"]
     assert low["denominator"] == high["denominator"]
 
@@ -147,20 +147,20 @@ def test_all_plus_without_core_stays_zero(frontend, skill_index, dim_specs):
     """core 全 0、plus 全 5 仍然是 0 分。加分项不能把「核心能力为零」救回来。"""
     ratings = {r["skillId"]: 5 for r in plus_of(frontend)}
     ratings.update({r["skillId"]: 0 for r in core_of(frontend)})
-    assert run(frontend, ratings, skill_index, dim_specs)["matchScore"] == 0.0
+    assert run(frontend, ratings, skill_index, dim_specs)["requiredScore"] == 0.0
 
 
 def test_plus_items_have_only_two_states(frontend, skill_index, dim_specs):
     result = run(frontend, _with_plus(frontend, None, 5), skill_index, dim_specs)
-    assert {p["status"] for p in result["plusItems"]} <= {"mastered", "pending"}
-    assert result["counts"]["plusMastered"] + result["counts"]["plusPending"] == len(
+    assert {p["status"] for p in result["bonusItems"]} <= {"mastered", "pending"}
+    assert result["counts"]["bonusMastered"] + result["counts"]["bonusPending"] == len(
         plus_of(frontend)
     )
 
 
 def test_plus_items_sorted_mastered_first(frontend, skill_index, dim_specs):
     result = run(frontend, _with_plus(frontend, None, 5), skill_index, dim_specs)
-    statuses = [p["status"] for p in result["plusItems"]]
+    statuses = [p["status"] for p in result["bonusItems"]]
     if "mastered" in statuses and "pending" in statuses:
         last_mastered = max(i for i, s in enumerate(statuses) if s == "mastered")
         assert statuses.index("pending") > last_mastered
@@ -168,8 +168,8 @@ def test_plus_items_sorted_mastered_first(frontend, skill_index, dim_specs):
 
 def test_plus_counts_reflect_mastery(frontend, skill_index, dim_specs):
     result = run(frontend, _with_plus(frontend, None, 5), skill_index, dim_specs)
-    assert result["counts"]["plusMastered"] == len(plus_of(frontend))
-    assert result["counts"]["plusPending"] == 0
+    assert result["counts"]["bonusMastered"] == len(plus_of(frontend))
+    assert result["counts"]["bonusPending"] == 0
 
 
 # ---------------- anyOf ----------------
@@ -181,7 +181,7 @@ def test_anyof_member_counts_once(frontend, skill_index, dim_specs):
     ids = [g["skillId"] for g in result["gaps"]]
     assert "react" not in ids
     assert "vue" not in ids  # react 4 级 = vue target 4，已达标
-    assert result["counts"]["mastered"] == 1
+    assert result["counts"]["requiredMastered"] == 1
 
 
 def test_anyof_uses_higher_of_two(frontend, skill_index, dim_specs):
@@ -238,7 +238,7 @@ def test_top_actions_at_most_three(frontend, skill_index, dim_specs):
 def test_counts_add_up(frontend, skill_index, dim_specs):
     result = run(frontend, uniform(frontend, 1), skill_index, dim_specs)
     counts = result["counts"]
-    assert counts["mastered"] + counts["weak"] + counts["missing"] == len(core_of(frontend))
+    assert counts["requiredMastered"] + counts["requiredWeak"] + counts["requiredMissing"] == len(core_of(frontend))
 
 
 # ---------------- 雷达 ----------------
@@ -287,21 +287,21 @@ def test_radar_core_weight_sums_to_job_core(frontend, skill_index, dim_specs):
 
 
 def test_empty_profile_status(frontend, skill_index, dim_specs):
-    """一条自评都没有 → EMPTY_PROFILE，matchScore 为 null。前端据此显示「尚未完成自评」。"""
+    """一条自评都没有 → EMPTY_PROFILE，requiredScore 为 null。前端据此显示「尚未完成自评」。"""
     result = run(frontend, {}, skill_index, dim_specs)
     assert result["status"] == EMPTY_PROFILE
-    assert result["matchScore"] is None
+    assert result["requiredScore"] is None
 
 
 def test_zero_ratings_is_not_empty_profile(frontend, skill_index, dim_specs):
     """评了但都是 0 级，是真实结论 0%，不是「还没自评」。两者提示完全不同。"""
     result = run(frontend, uniform(frontend, 0), skill_index, dim_specs)
     assert result["status"] == OK
-    assert result["matchScore"] == 0.0
+    assert result["requiredScore"] == 0.0
 
 
 def test_no_core_requirement_status(skill_index, dim_specs):
-    """只有 plus 的岗位：分母为 0，返回 NO_CORE_REQUIREMENT 而不是除零崩溃。"""
+    """只有 plus 的岗位：分母为 0，返回 NO_REQUIRED_REQUIREMENT 而不是除零崩溃。"""
     job = {
         "id": "x",
         "name": "测试岗位",
@@ -311,8 +311,8 @@ def test_no_core_requirement_status(skill_index, dim_specs):
         ],
     }
     result = run(job, {"js-core": 3}, skill_index, dim_specs)
-    assert result["status"] == NO_CORE_REQUIREMENT
-    assert result["matchScore"] is None
+    assert result["status"] == NO_REQUIRED_REQUIREMENT
+    assert result["requiredScore"] is None
     assert result["denominator"] == 0
 
 
@@ -320,7 +320,7 @@ def test_three_jobs_score_differently(skill_index, dim_specs, jobs_by_id):
     """同一份中档画像，三岗分数必须不同——否则说明维度/权重没被真正用上。"""
     ratings = {skill_id: 2 for skill_id in skill_index}
     scores = {
-        job_id: run(job, ratings, skill_index, dim_specs)["matchScore"]
+        job_id: run(job, ratings, skill_index, dim_specs)["requiredScore"]
         for job_id, job in jobs_by_id.items()
     }
     assert len(set(scores.values())) == 3, scores

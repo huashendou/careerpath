@@ -1,9 +1,9 @@
 """`/internal/match` 契约与口径测试。
 
 重点守三条红线：
-1. **证据不进分数**：同一份自评，加满证据后 `matchScore` 必须逐位相等；
+1. **证据不进分数**：同一份自评，加满证据后 `requiredScore` 必须逐位相等；
 2. **加分项不进分母**：`denominator` 只由 required 组成，前端岗是 255 不是 100；
-3. **空集不返回 0**：空自评 `EMPTY_PROFILE`、无必备要求 `NO_CORE_REQUIREMENT`，两者都是 `null`。
+3. **空集不返回 0**：空自评 `EMPTY_PROFILE`、无必备要求 `NO_REQUIRED_REQUIREMENT`，两者都是 `null`。
 """
 
 from __future__ import annotations
@@ -99,7 +99,7 @@ def test_evidence_does_not_change_score() -> None:
         }
     )
 
-    assert without["matchScore"] == with_evidence["matchScore"]
+    assert without["requiredScore"] == with_evidence["requiredScore"]
     assert without["numerator"] == with_evidence["numerator"]
     assert without["denominator"] == with_evidence["denominator"]
     # 变的只有证据覆盖面
@@ -119,7 +119,13 @@ def test_empty_profile_returns_null_not_zero() -> None:
         }
     )
     assert body["status"] == "EMPTY_PROFILE"
-    assert body["matchScore"] is None
+    assert body["requiredScore"] is None
+    # 这个岗位确有加分项（bonusDenominator=39），下面的 null 才有意义：
+    # 没自评 ≠ 加分项拿了 0%，两个分数必须同为 null。
+    assert body["bonusDenominator"] > 0
+    assert body["bonusScore"] is None
+    # evidenceCoverage 不适用同一规则：没有证据本身就是真实的 0%。
+    assert body["evidenceCoverage"] == 0.0
     assert body["gaps"]  # 缺口照样列出来，只是不给百分比
 
 
@@ -134,10 +140,10 @@ def test_no_required_requirement_returns_null() -> None:
             "userSkills": [{"skillId": "js-core", "level": 5}],
         }
     )
-    assert body["status"] == "NO_CORE_REQUIREMENT"
-    assert body["matchScore"] is None
+    assert body["status"] == "NO_REQUIRED_REQUIREMENT"
+    assert body["requiredScore"] is None
     assert body["denominator"] == 0
-    assert len(body["plusItems"]) > 0
+    assert len(body["bonusItems"]) > 0
 
 
 def test_radar_empty_dimension_is_null_not_zero() -> None:
@@ -172,7 +178,7 @@ def test_anyof_counted_once() -> None:
     body = _post(payload)
     assert body["denominator"] == 36  # 9 × 4，不是 72
     assert body["numerator"] == 36  # React 5 级 → L_eff=5，取 min(5,4)=4
-    assert body["matchScore"] == 100.0
+    assert body["requiredScore"] == 100.0
     assert body["gaps"] == []
 
 
@@ -189,7 +195,7 @@ def test_bonus_score_is_separate() -> None:
     assert body["bonusDenominator"] > 0
     assert body["bonusScore"] is not None
     # 两个分数各算各的，不是同一个数
-    assert body["bonusScore"] != body["matchScore"]
+    assert body["bonusScore"] != body["requiredScore"]
 
 
 def test_unknown_skill_dropped_with_warning(caplog: pytest.LogCaptureFixture) -> None:

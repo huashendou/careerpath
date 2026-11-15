@@ -170,13 +170,18 @@ class Radar(CamelModel):
 
 
 class MatchCounts(CamelModel):
-    mastered: int
-    weak: int
-    missing: int
-    plus_mastered: int
-    plus_pending: int
-    evidence_covered: int
+    """计数一律带前缀：required* 只统计必备项，bonus* 只统计加分项。
+
+    不加前缀的 `mastered` 会被误读成「总共掌握了几项」，而必备与加分本来就不该相加。
+    """
+
+    required_mastered: int
+    required_weak: int
+    required_missing: int
     required_total: int
+    bonus_mastered: int
+    bonus_pending: int
+    evidence_covered: int
 
 
 class MatchMeta(CamelModel):
@@ -189,17 +194,18 @@ class MatchOut(CamelModel):
     job_id: str
     job_name: str
     user_id: int | None
-    match_score: float | None = Field(description="只由自评等级决定；无法算分时为 null")
+    # 刻意不叫 matchScore：那个名字会让人以为它是「总分」，而契约要求必备/加分分开出分。
+    required_score: float | None = Field(description="只由自评等级决定；无法算分时为 null")
     bonus_score: float | None
-    status: Literal["ok", "NO_CORE_REQUIREMENT", "EMPTY_PROFILE"]
+    status: Literal["ok", "NO_REQUIRED_REQUIREMENT", "EMPTY_PROFILE"]
     numerator: int
     denominator: int
     bonus_numerator: int
     bonus_denominator: int
-    evidence_coverage: float | None = Field(description="证据覆盖面，独立展示，不进 matchScore")
+    evidence_coverage: float | None = Field(description="证据覆盖面，独立展示，不进 requiredScore")
     counts: MatchCounts
     gaps: list[GapItem]
     top_actions: list[str]
-    plus_items: list[BonusItem]
+    bonus_items: list[BonusItem]
     radar: Radar
     meta: MatchMeta

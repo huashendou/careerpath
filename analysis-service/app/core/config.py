@@ -17,13 +17,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
-    """优先级：环境变量 > analysis-service/.env > 本类默认值。
+    """优先级：环境变量 > 项目根 .env > 本类默认值。
 
-    口令类字段的默认值一律是开发占位符，真实值只允许出现在 `.env`（已在 .gitignore）。
+    口令类字段的默认值一律是开发占位符，真实值只允许出现在根目录 `.env`（已在 .gitignore）。
+    两个服务**共读同一份** `.env`：内部密钥写两处最容易漂移，一漂就是一串 401。
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # 项目根 .env 是唯一权威来源（与 Java 共读同一份）；本目录下的 .env 只用于本地调试覆盖。
+        # 顺序：先列的被后列的覆盖，因此把根 .env 放最后。
+        env_file=(".env", str(PROJECT_ROOT / ".env")),
         env_file_encoding="utf-8",
         extra="ignore",
     )
