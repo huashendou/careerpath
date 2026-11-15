@@ -1,6 +1,12 @@
 <script setup>
 import { reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+const route = useRoute()
 
 const mode = ref('login')
 const loading = ref(false)
@@ -10,11 +16,11 @@ const formRef = ref(null)
 const rules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 32, message: '3-32 位字母、数字或下划线', trigger: 'blur' },
+    { min: 4, max: 32, message: '4-32 位字母、数字或下划线', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, max: 64, message: '6-64 位', trigger: 'blur' },
+    { min: 8, max: 64, message: '至少 8 位', trigger: 'blur' },
   ],
 }
 
@@ -23,11 +29,15 @@ async function submit() {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
 
-  // T0 只有表单与校验，后端 /api/auth/* 尚未实现（现返回 404）。
-  // 这里如实告知，不伪造「登录成功」，也不跳转——否则评审会以为鉴权已通。
   loading.value = true
   try {
-    ElMessage.info('账号体系在 T1 交付：当前仅完成表单与前端校验，后端接口尚未实装')
+    if (mode.value === 'login') await auth.login(form.username, form.password)
+    else await auth.register(form.username, form.password)
+    ElMessage.success(mode.value === 'login' ? '登录成功' : '注册成功')
+    router.replace(route.query.redirect || '/dashboard')
+  } catch (error) {
+    // 后端错误体已归一成中文（INVALID_CREDENTIALS →「用户名或密码不正确」），直接展示
+    ElMessage.error(error.message || '操作失败')
   } finally {
     loading.value = false
   }
@@ -45,25 +55,17 @@ async function submit() {
         </div>
       </div>
 
-      <el-alert
-        class="notice"
-        type="info"
-        :closable="false"
-        show-icon
-        title="账号体系在 T1 交付"
-        description="当前为 T0 骨架：登录注册接口尚未实装，页面与路由已就位。"
-      />
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="submit">
         <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username" placeholder="3-32 位字母、数字或下划线" autocomplete="username" />
+          <el-input v-model="form.username" placeholder="4-32 位字母、数字或下划线" autocomplete="username" />
         </el-form-item>
         <el-form-item label="密码" prop="password">
           <el-input
             v-model="form.password"
             type="password"
             show-password
-            placeholder="6-64 位"
+            placeholder="至少 8 位"
             autocomplete="current-password"
             @keyup.enter="submit"
           />
@@ -135,10 +137,6 @@ async function submit() {
 .brand-sub {
   font-size: 12px;
   color: var(--cp-text-3);
-}
-
-.notice {
-  margin-bottom: 18px;
 }
 
 .submit {
