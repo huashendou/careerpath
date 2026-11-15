@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   id            BIGINT       NOT NULL AUTO_INCREMENT,
   username      VARCHAR(32)  NOT NULL COMMENT '登录名，唯一',
   password_hash VARCHAR(100) NOT NULL COMMENT 'BCrypt，绝不返回给前端',
-  role          VARCHAR(16)  NOT NULL DEFAULT 'USER',
+  role          VARCHAR(16)  NOT NULL DEFAULT 'student' COMMENT '首版只有 student，与契约一致（小写）',
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
