@@ -6,6 +6,10 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,10 +25,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class StatsService {
 
-    private final JdbcTemplate jdbc;
+    private static final Logger log = LoggerFactory.getLogger(StatsService.class);
 
-    public StatsService(JdbcTemplate jdbc) {
+    private final JdbcTemplate jdbc;
+    private final ObjectMapper json;
+
+    public StatsService(JdbcTemplate jdbc, ObjectMapper json) {
         this.jdbc = jdbc;
+        this.json = json;
     }
 
     @Transactional(readOnly = true)
@@ -95,5 +103,109 @@ public class StatsService {
     private Instant toInstant(ResultSet rs, String column) throws SQLException {
         LocalDateTime time = rs.getObject(column, LocalDateTime.class);
         return time == null ? null : time.toInstant(ZoneOffset.UTC);
+    }
+
+    // ---------------------------------------------------------------- 数据看板（二期模块 9）
+
+    /**
+     * 数据看板聚合。
+     *
+     * <p>模块 9 按 c3.3 裁决**不单开页面**，这些数字直接进概览页的卡片区。四块内容都只做
+     * 「已经存在的数据的另一种切法」，不引入新的埋点或统计表——为一张演示看板加事件表，
+     * 是在用真实复杂度换一个漂亮图。
+     *
+     * <p>{@code topGaps} 取「每个岗位最近一次快照」的差距并计频次：同一个技能在三份 JD 里都差，
+     * 才是真的该先补的；把历史上所有快照都算进来会让「反复匹配同一岗位」把频次刷高。
+     */
+    @Transactional(readOnly = true)
+    public StatsInsights insights(Long userId) {
+        List<StatusCount> applicationStatus = jdbc.query("""
+                SELECT status, COUNT(*) AS cnt FROM job_application
+                 WHERE user_id = ? GROUP BY status
+                 ORDER BY FIELD(status, 'todo', 'applied', 'interview', 'closed')
+                """, (rs, i) -> new StatusCount(rs.getString("status"), rs.getInt("cnt")), userId);
+
+        List<StatusCount> interviewResult = jdbc.query("""
+                SELECT result, COUNT(*) AS cnt FROM interview_record
+                 WHERE user_id = ? GROUP BY result
+                 ORDER BY FIELD(result, 'pass', 'pending', 'reject')
+                """, (rs, i) -> new StatusCount(rs.getString("result"), rs.getInt("cnt")), userId);
+
+        List<MatchPoint> matchTrend = jdbc.query("""
+                SELECT r.created_at, r.required_score,
+                       COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.detail, '$.jobTitle')), j.title) AS job_title
+                  FROM skill_match_result r
+                  LEFT JOIN job_position j ON j.id = r.job_position_id
+                 WHERE r.user_id = ?
+                 ORDER BY r.id DESC LIMIT 10
+                """, (rs, i) -> new MatchPoint(toInstant(rs, "created_at"), rs.getString("job_title"),
+                nullableDouble(rs, "required_score")), userId);
+
+        List<SkillFrequency> topGaps = topGaps(userId);
+
+        int taskTotal = count("SELECT COUNT(*) FROM learning_task WHERE user_id = ?", userId);
+        int taskDone = count("SELECT COUNT(*) FROM learning_task WHERE user_id = ? AND status = 'done'", userId);
+        // 没有任务时完成率为 null（不适用），不返回 0% —— 「还没开始」和「一个都没完成」不是一回事
+        Double taskRate = taskTotal == 0 ? null : Math.round(taskDone * 1000.0 / taskTotal) / 10.0;
+
+        return new StatsInsights(applicationStatus, interviewResult, matchTrend, topGaps,
+                new TaskCompletion(taskDone, taskTotal, taskRate));
+    }
+
+    /** 每个岗位只取最近一次快照，解析 JSON 里的 gaps 计频次。 */
+    private List<SkillFrequency> topGaps(Long userId) {
+        List<String> details = jdbc.queryForList("""
+                SELECT r.detail
+                  FROM skill_match_result r
+                  JOIN (SELECT job_position_id, MAX(id) AS mid
+                          FROM skill_match_result
+                         WHERE user_id = ? AND job_position_id IS NOT NULL
+                         GROUP BY job_position_id) latest ON latest.mid = r.id
+                 WHERE r.detail IS NOT NULL
+                """, String.class, userId);
+
+        Map<String, SkillFrequency> counter = new java.util.LinkedHashMap<>();
+        for (String raw : details) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode root = json.readTree(raw);
+                for (com.fasterxml.jackson.databind.JsonNode gap : root.path("gaps")) {
+                    String skillId = gap.path("skillId").asText(null);
+                    if (skillId == null) {
+                        continue;
+                    }
+                    String name = gap.path("skillName").asText(skillId);
+                    SkillFrequency current = counter.get(skillId);
+                    counter.put(skillId, new SkillFrequency(skillId, name,
+                            current == null ? 1 : current.count() + 1,
+                            (current == null ? 0 : current.priority()) + gap.path("priority").asInt(0)));
+                }
+            } catch (Exception ex) {
+                // 单条快照坏了不影响整块看板：跳过它，其余照常统计
+                log.warn("解析匹配快照失败，已跳过：{}", ex.getMessage());
+            }
+        }
+        return counter.values().stream()
+                .sorted((a, b) -> b.count() != a.count()
+                        ? b.count() - a.count()
+                        : b.priority() - a.priority())
+                .limit(5)
+                .toList();
+    }
+
+    public record StatusCount(String status, int count) {
+    }
+
+    public record MatchPoint(Instant at, String jobTitle, Double requiredScore) {
+    }
+
+    public record SkillFrequency(String skillId, String skillName, int count, int priority) {
+    }
+
+    public record TaskCompletion(int done, int total, Double rate) {
+    }
+
+    public record StatsInsights(List<StatusCount> applicationStatus, List<StatusCount> interviewResult,
+                                List<MatchPoint> matchTrend, List<SkillFrequency> topGaps,
+                                TaskCompletion taskCompletion) {
     }
 }

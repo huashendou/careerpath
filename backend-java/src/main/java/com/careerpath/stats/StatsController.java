@@ -26,4 +26,13 @@ public class StatsController {
         }
         return statsService.overview(principal.id());
     }
+
+    /** 数据看板（二期模块 9）。不单开页面，概览页直接消费。 */
+    @GetMapping("/insights")
+    public StatsService.StatsInsights insights(@AuthenticationPrincipal AuthPrincipal principal) {
+        if (principal == null) {
+            throw new ApiException(ErrorCode.UNAUTHORIZED);
+        }
+        return statsService.insights(principal.id());
+    }
 }
