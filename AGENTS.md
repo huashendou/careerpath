@@ -38,7 +38,7 @@
 | 层 | 选型 | 说明 |
 |---|---|---|
 | 前端 | Vue 3 + Vite + Element Plus + Pinia + Axios + ECharts | 9 个页面；`/api` 代理到 Java |
-| 业务后端 | Java 25 + Spring Boot + MyBatis-Plus + Spring Security + JWT | 端口 8080，前缀 `/api`；Maven 构建 |
+| 业务后端 | Java 25 + Spring Boot **3.5.16** + MyBatis-Plus **3.5.18.1** + Spring Security + JWT | 端口 8080，前缀 `/api`；Maven **3.9.16**，已配阿里云镜像 |
 | 智能分析服务 | Python + FastAPI + Pandas + NumPy | 端口 8000，前缀 `/internal`；共享密钥校验；**不对外** |
 | 数据库 | MySQL（库名 `career_path`，utf8mb4） | 20 张表，见 `docs/P0-重构方案.md` 第四节 |
 | 可视化 | ECharts（npm 本地依赖） | 技能画像、岗位分布、投递漏斗、趋势 |
@@ -123,5 +123,5 @@
 - ✅ v1「职能雷达」：数据模型、后端接口、Vue 页面、90 项 pytest 已完成；R1 有条件通过，`dev` 保留为历史基线，**不合并 main**。
 - ✅ 需求基线确认：按《整体介绍》重建，项目名改为「职航 CareerPath」，技术路线 A（Java + Python 双服务）。
 - ✅ 重构蓝图：`docs/P0-重构方案.md` p1.0（架构、20 张表、9 页、T0–T6）。
-- ⛔ T0 前置阻塞：本机无 Maven / Gradle，也未装 IntelliJ，需先安装构建工具（或使用 `mvnw`，需联网）。
-- ⬜ T0–T6 全部未开始。
+- ✅ 环境就绪：JDK 25.0.2、Maven 3.9.16（已入用户 PATH）、`~/.m2/settings.xml` 阿里云镜像，`dependency:resolve` 实测 BUILD SUCCESS。
+- ⬜ T0–T6 均未开始，T0 待 WorkBuddy 开工。
