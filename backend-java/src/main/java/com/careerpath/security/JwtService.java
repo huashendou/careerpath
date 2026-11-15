@@ -34,6 +34,13 @@ public class JwtService {
 
     public JwtService(JwtProperties properties) {
         String secret = properties.secret() == null ? "" : properties.secret();
+        // 没配 JWT_SECRET 且没有任何默认值时，Spring 会把 ${JWT_SECRET} 原样当值传进来
+        // （正好 13 字节）。直接报「当前 13 字节」会把人引去改 yml，实际是 .env 没配。
+        if (secret.contains("${")) {
+            throw new IllegalStateException(
+                    "JWT_SECRET 未配置：请在项目根 .env 中设置（可复制 .env.example）。"
+                            + "缺失时服务拒绝启动，以免用弱密钥签发出可被伪造的令牌");
+        }
         if (secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
             // 起不来比起到一半再报错好：密钥太短会让 HS256 直接抛 WeakKeyException
             throw new IllegalStateException(
