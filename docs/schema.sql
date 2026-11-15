@@ -1,8 +1,9 @@
 -- 职航 CareerPath · 建库建表（15 张）
 -- 依据：docs/P0-重构方案.md 第四节
 -- 执行：mysql -u root -p < docs/schema.sql
--- 说明：模块 2（求职工作台）与模块 8（面试复盘）按 2026-11-15 范围裁决不做，
---       对应 company / application_* / interview_* / question_skill_relation 六张表已裁掉。
+-- 说明：模块 2（求职工作台）与模块 8（面试复盘）按 c3.3 口径放在二期做简化版，
+--       一期的 15 张表不含 company / application_* / interview_* / question_skill_relation；
+--       二期把其中 6 张压成 job_application、interview_record 两张（明细存 JSON）。
 
 CREATE DATABASE IF NOT EXISTS career_path
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -14,7 +15,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   id            BIGINT       NOT NULL AUTO_INCREMENT,
   username      VARCHAR(32)  NOT NULL COMMENT '登录名，唯一',
   password_hash VARCHAR(100) NOT NULL COMMENT 'BCrypt，绝不返回给前端',
-  role          VARCHAR(16)  NOT NULL DEFAULT 'USER',
+  role          VARCHAR(16)  NOT NULL DEFAULT 'student' COMMENT '首版只有 student，与契约一致（小写）',
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

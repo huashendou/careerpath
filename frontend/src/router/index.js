@@ -46,7 +46,8 @@ const routes = [
         path: 'profile',
         name: 'profile',
         component: () => import('../views/ProfileView.vue'),
-        meta: { title: '技能画像', phase: 'T3', icon: 'User' },
+        // 档案部分 T1 已交付，技能自评与证据链在 T3；页面内自行标注，这里按已交付记
+        meta: { title: '技能画像', phase: 'T1', icon: 'User' },
       },
       {
         path: 'match/:jobId',

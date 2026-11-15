@@ -25,8 +25,17 @@ die() { echo "[dev-up] 失败：$*" >&2; exit 1; }
 resolve_mvn() {
   if [[ -n "${MVN:-}" ]]; then echo "$MVN"; return; fi
   if command -v mvn > /dev/null 2>&1; then command -v mvn; return; fi
-  local candidate="$HOME/.local/share/maven/apache-maven-3.9.16/bin/mvn"
-  [[ -x "$candidate" ]] && echo "$candidate"
+  # 装在哪都有可能：传统 ~/.local、WorkBuddy 自带目录、Windows 的 Program Files。
+  # 用 glob 从新到旧取第一个可执行的，避免把版本号硬编码（换一次版本就得改一次脚本）。
+  local pattern candidate
+  for pattern in \
+    "$HOME/.local/share/maven/apache-maven-*/bin/mvn" \
+    "$HOME/.workbuddy/binaries/maven/apache-maven-*/bin/mvn" \
+    "/c/Program Files/apache-maven*/bin/mvn"; do
+    for candidate in $(ls -d $pattern 2>/dev/null | sort -rV); do
+      [[ -x "$candidate" ]] && { echo "$candidate"; return; }
+    done
+  done
 }
 
 # 内部令牌只从根 .env 读：Java 与分析服务共用这一份，避免两边漂移成 401。

@@ -16,11 +16,11 @@ const formRef = ref(null)
 const rules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 32, message: '3-32 位字母、数字或下划线', trigger: 'blur' },
+    { min: 4, max: 32, message: '4-32 位字母、数字或下划线', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, max: 64, message: '6-64 位', trigger: 'blur' },
+    { min: 8, max: 64, message: '至少 8 位', trigger: 'blur' },
   ],
 }
 
@@ -36,7 +36,7 @@ async function submit() {
     ElMessage.success(mode.value === 'login' ? '登录成功' : '注册成功')
     router.replace(route.query.redirect || '/dashboard')
   } catch (error) {
-    // 账号体系在 T1 落地；此刻后端返回 401/404 属预期，如实提示而不是假装成功
+    // 后端错误体已归一成中文（INVALID_CREDENTIALS →「用户名或密码不正确」），直接展示
     ElMessage.error(error.message || '操作失败')
   } finally {
     loading.value = false
@@ -55,25 +55,17 @@ async function submit() {
         </div>
       </div>
 
-      <el-alert
-        class="notice"
-        type="info"
-        :closable="false"
-        show-icon
-        title="账号体系在 T1 交付"
-        description="当前为 T0 骨架：登录注册接口尚未实装，页面与路由已就位。"
-      />
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="submit">
         <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username" placeholder="3-32 位字母、数字或下划线" autocomplete="username" />
+          <el-input v-model="form.username" placeholder="4-32 位字母、数字或下划线" autocomplete="username" />
         </el-form-item>
         <el-form-item label="密码" prop="password">
           <el-input
             v-model="form.password"
             type="password"
             show-password
-            placeholder="6-64 位"
+            placeholder="至少 8 位"
             autocomplete="current-password"
             @keyup.enter="submit"
           />
@@ -145,10 +137,6 @@ async function submit() {
 .brand-sub {
   font-size: 12px;
   color: var(--cp-text-3);
-}
-
-.notice {
-  margin-bottom: 18px;
 }
 
 .submit {
