@@ -113,13 +113,14 @@
 ├── docs/                      # 设计说明、验收记录、协作看板（接口契约）
 ├── backend/
 │   ├── app/
-│   │   ├── main.py            # FastAPI 入口、CORS、路由注册
-│   │   ├── core/              # 配置（.env 读取）、JWT、密码哈希
-│   │   ├── db/                # 引擎、Session、Base
-│   │   ├── models/            # ORM：user / skill / job / profile / report
-│   │   ├── schemas/           # Pydantic 出入参
-│   │   ├── api/               # 路由：auth / skills / jobs / profiles / analysis
-│   │   └── services/          # matching（core-only 算分）/ radar / resume_parser
+│   │   ├── main.py            # FastAPI 入口、CORS、异常处理器
+│   │   ├── core/              # config（.env）/ errors（错误码）/ security（JWT+bcrypt）
+│   │   ├── db/                # 引擎、Session、Base（naive UTC 时间约定）
+│   │   ├── models/            # ORM：9 张表
+│   │   ├── schemas/           # Pydantic 出入参（camelCase，ISO Z 时间）
+│   │   ├── api/               # 路由：catalog / auth / profiles / analysis / reports / resume
+│   │   └── services/          # matching（纯函数算分）/ runner（查库组装）
+│   ├── tests/                 # 90 项 pytest，SQLite 跑，不依赖 MySQL
 │   ├── seed.py                # data/*.json → MySQL 幂等导入
 │   ├── requirements.txt
 │   └── .env.example
@@ -133,6 +134,8 @@
         ├── views/             # 登录、画像录入、匹配分析、报告
         └── components/        # RadarChart、GapTable、SkillPicker
 ```
+
+**9 张表**：`dimensions` `skills` `jobs` `job_requirements` `app_meta` `users` `profiles` `profile_skills` `reports`。
 
 ## 十、工作约定
 
@@ -154,9 +157,12 @@
 ## 十一、当前状态
 
 - ✅ P0 数据模型已验收（61 技能 / 6 维 / 3 岗 86 条 / core-only 计分口径 v0.2）
-- ✅ 协作基础：git 仓库 + `dev`/`main` 分支 + 协作看板 c2.0（接口契约）+ 评审记录
-- ⬜ P1 后端骨架 + MySQL 建表 + 种子导入 + 技能/岗位只读接口
-- ⬜ P2 账号体系（JWT 注册/登录）+ 技能画像 CRUD
-- ⬜ P3 匹配与差距分析服务端算分（core-only 断言迁移为 pytest）
+- ✅ 协作基础：git 仓库 + `dev`/`main` 分支 + 协作看板（接口契约，现 c2.1）+ 评审记录
+- ✅ P1 后端骨架 + MySQL 建表 9 张 + 种子导入 + 技能/岗位只读接口
+- ✅ P2 账号体系（JWT 注册/登录/me）+ 技能画像 CRUD（最多 10 份）
+- ✅ P3 匹配与差距分析 `/api/analysis/match` + 报告存档 + 90 项 pytest 全绿
+- 🟡 P5-1 简历解析接口已实现，等 P4 前端接预填交互
 - ⬜ P4 Vue 前端：登录、录入、分析、报告四个页面
-- ⬜ P5 联调、粘贴简历解析、整体打磨
+- ⬜ P5-2 前后端联调与整体打磨
+
+**文档分工**：`docs/协作看板.md` 第三节是接口契约的唯一来源；`docs/API.md` 只写「字段在后端怎么算、从哪张表取」，不再定义契约。
