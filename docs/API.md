@@ -94,7 +94,7 @@ radar.axes[k].current = Σ_core_k(w × L_eff) / Σ_core_k(w)
 
 | code | HTTP | 类 |
 |---|---|---|
-| `VALIDATION_ERROR` | 422 | `ValidationError` / FastAPI 参数校验 |
+| `VALIDATION_ERROR` | 422 | `ValidationError`（含同一 `skillId` 在 PUT 画像里重复提交）/ FastAPI 参数校验 |
 | `UNAUTHORIZED` | 401 | `Unauthorized` |
 | `INVALID_CREDENTIALS` | 401 | `InvalidCredentials` |
 | `JOB_NOT_FOUND` | 404 | `JobNotFound` |
