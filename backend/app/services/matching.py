@@ -18,10 +18,13 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 LEVEL_MIN = 0
 LEVEL_MAX = 5
@@ -76,19 +79,34 @@ def effective_level(req: Mapping[str, Any], ratings: Mapping[str, Any]) -> int:
 def normalize_requirements(
     requirements: Iterable[Mapping[str, Any]],
     skills: Mapping[str, Mapping[str, Any]],
+    *,
+    job_id: str = "-",
 ) -> list[dict[str, Any]]:
     """清洗要求列表：去重（保留首条）、丢弃引用不存在的技能、丢弃 target<=0 的条目。
 
     这些在 seed 阶段就该校验失败；运行期再兜一层，保证不会因为一条脏数据让整页崩掉。
+
+    丢弃**必须留日志**：静默跳过会让「岗位少了一条要求」这件事在结果里看不出来，
+    分母悄悄变小也没人知道。`job_id` 只为日志可定位而传，不影响算分。
     """
     seen: set[str] = set()
     cleaned: list[dict[str, Any]] = []
     for raw in requirements:
         skill_id = raw["skillId"]
-        if skill_id in seen or skill_id not in skills:
+        if skill_id in seen:
+            logger.warning("算分跳过重复要求：job=%s skillId=%s", job_id, skill_id)
+            continue
+        if skill_id not in skills:
+            logger.warning("算分跳过未知技能：job=%s skillId=%s", job_id, skill_id)
             continue
         target = int(raw.get("target") or 0)
         if target <= 0:
+            logger.warning(
+                "算分跳过目标等级非正的要求：job=%s skillId=%s target=%s",
+                job_id,
+                skill_id,
+                raw.get("target"),
+            )
             continue
         seen.add(skill_id)
         cleaned.append(
@@ -259,7 +277,7 @@ def analyze(
     profile_id: int | None = None,
 ) -> dict[str, Any]:
     """算分入口。返回结构与看板 3.5 的 MatchResult 逐字段一致。"""
-    cleaned = normalize_requirements(requirements, skills)
+    cleaned = normalize_requirements(requirements, skills, job_id=job_id)
     core = _core_items(cleaned)
     plus = _plus_items(cleaned)
 

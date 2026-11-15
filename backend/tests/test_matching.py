@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 
 import pytest
@@ -52,6 +53,10 @@ def uniform(job: dict, value: int | None = None) -> dict:
     return {
         r["skillId"]: (r["target"] // 2 if value is None else value) for r in core_of(job)
     }
+
+
+def _warnings(caplog) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
 
 
 # ---------------- 分母 ----------------
@@ -348,7 +353,7 @@ def test_clamp_level(raw, expected):
     assert clamp_level(raw) == expected
 
 
-def test_duplicate_requirement_kept_once(skill_index, dim_specs):
+def test_duplicate_requirement_kept_once(skill_index, dim_specs, caplog):
     job = {
         "id": "x",
         "name": "重复要求",
@@ -357,11 +362,14 @@ def test_duplicate_requirement_kept_once(skill_index, dim_specs):
             {"skillId": "js-core", "weight": 70, "target": 4, "type": "core"},
         ],
     }
-    result = run(job, {}, skill_index, dim_specs)
+    with caplog.at_level(logging.WARNING, logger="app.services.matching"):
+        result = run(job, {}, skill_index, dim_specs)
     assert result["denominator"] == 30 * 4  # 保留首条，不叠加
+    assert any("js-core" in m and "job=x" in m for m in _warnings(caplog)), _warnings(caplog)
 
 
-def test_unknown_skill_requirement_dropped(skill_index, dim_specs):
+def test_unknown_skill_requirement_dropped(skill_index, dim_specs, caplog):
+    """未知 skillId 必须跳过**并留日志**。静默跳过会让分母悄悄变小，没人看得出来。"""
     job = {
         "id": "x",
         "name": "脏数据",
@@ -370,11 +378,13 @@ def test_unknown_skill_requirement_dropped(skill_index, dim_specs):
             {"skillId": "not-exist", "weight": 70, "target": 4, "type": "core"},
         ],
     }
-    result = run(job, {}, skill_index, dim_specs)
+    with caplog.at_level(logging.WARNING, logger="app.services.matching"):
+        result = run(job, {}, skill_index, dim_specs)
     assert result["denominator"] == 30 * 4
+    assert any("not-exist" in m and "job=x" in m for m in _warnings(caplog)), _warnings(caplog)
 
 
-def test_zero_target_requirement_dropped(skill_index, dim_specs):
+def test_zero_target_requirement_dropped(skill_index, dim_specs, caplog):
     job = {
         "id": "x",
         "name": "target 为 0",
@@ -383,8 +393,10 @@ def test_zero_target_requirement_dropped(skill_index, dim_specs):
             {"skillId": "html-css", "weight": 70, "target": 0, "type": "core"},
         ],
     }
-    result = run(job, {}, skill_index, dim_specs)
+    with caplog.at_level(logging.WARNING, logger="app.services.matching"):
+        result = run(job, {}, skill_index, dim_specs)
     assert result["denominator"] == 30 * 4
+    assert any("html-css" in m and "target" in m for m in _warnings(caplog)), _warnings(caplog)
 
 
 def test_meta_block_is_filled(frontend, skill_index, dim_specs):

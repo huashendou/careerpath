@@ -183,6 +183,39 @@ def test_profile_unknown_skill(client, auth_headers):
     assert resp.json()["detail"]["code"] == "UNKNOWN_SKILL"
 
 
+def test_profile_duplicate_skill_rejected(client, auth_headers):
+    """同一 skillId 提交两次必须是 422，不能落到 UNIQUE 约束上变成 500。
+
+    这条守两件事：错误码可读（4001 类业务码而不是驱动层约束名），以及校验失败时
+    已有画像一个字都不改——入口拦截发生在 delete 之前。
+    """
+    pid = client.post(f"{API}/profiles", json={"name": "p"}, headers=auth_headers).json()["id"]
+    client.put(
+        f"{API}/profiles/{pid}",
+        json={"skills": [{"skillId": "js-core", "level": 3}, {"skillId": "html-css", "level": 4}]},
+        headers=auth_headers,
+    )
+
+    resp = client.put(
+        f"{API}/profiles/{pid}",
+        json={
+            "skills": [
+                {"skillId": "js-core", "level": 5},
+                {"skillId": "html-css", "level": 4},
+                {"skillId": "js-core", "level": 2},
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["detail"]["code"] == "VALIDATION_ERROR"
+    assert "js-core" in body["detail"]["message"]
+
+    kept = client.get(f"{API}/profiles/{pid}", headers=auth_headers).json()["skills"]
+    assert {s["skillId"]: s["level"] for s in kept} == {"js-core": 3, "html-css": 4}
+
+
 def test_profile_limit(client, auth_headers):
     for index in range(10):
         resp = client.post(f"{API}/profiles", json={"name": f"p{index}"}, headers=auth_headers)

@@ -11,7 +11,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import CurrentUser, DbSession
-from app.core.errors import ProfileLimit, ProfileNotFound, UnknownSkill
+from app.core.errors import ProfileLimit, ProfileNotFound, UnknownSkill, ValidationError
 from app.models.entities import Profile, ProfileSkill, Skill, User
 from app.schemas.dto import (
     ProfileCreateIn,
@@ -68,6 +68,22 @@ def _assert_known(db: Session, skills: list[SkillLevelIn]) -> None:
         raise UnknownSkill(sorted(unknown))
 
 
+def _assert_unique_skill(skills: list[SkillLevelIn]) -> None:
+    """同一 skillId 提交两次 → 422。
+
+    不依赖 `UNIQUE(profile_id, skill_id)` 抛 IntegrityError：那会在 commit 时炸成 500，
+    且错误信息只有驱动层约束名，用户看不懂。入口先拦，message 直接说清哪个技能重复了。
+    """
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for item in skills:
+        if item.skillId in seen:
+            duplicates.add(item.skillId)
+        seen.add(item.skillId)
+    if duplicates:
+        raise ValidationError(f"同一技能重复提交：{', '.join(sorted(duplicates))}")
+
+
 @router.post("", response_model=ProfileOut, status_code=201, summary="新建画像")
 def create_profile(payload: ProfileCreateIn, user: CurrentUser, db: DbSession) -> ProfileOut:
     count = db.execute(
@@ -117,6 +133,7 @@ def update_profile(
 
     if payload.skills is not None:
         # 全量覆盖：先删后插。逐条 diff 在这里没有价值，客户端本来就提交整份表单。
+        _assert_unique_skill(payload.skills)
         _assert_known(db, payload.skills)
         db.execute(delete(ProfileSkill).where(ProfileSkill.profile_id == profile.id))
         db.flush()
