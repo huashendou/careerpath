@@ -1,4 +1,4 @@
-// 一期 7 个页面 = 模块 1 / 3 / 4 / 5 / 6 / 7。
+// 一期 7 个页面 = 模块 1 / 3 / 4 / 5 / 6 / 7；二期 +2 页（/applications、/interviews）= 9 页。
 // c3.3 范围裁决：模块 2 求职工作台、8 面试复盘、9 数据分析中心改为**二期**做简化版
 // （T7–T9，+2 表 +2 页 /applications、/interviews），一期**不得**为它们预留空页。
 // 模块 10 项目成果并入模块 5，作为证据来源，不单设页面。
@@ -28,7 +28,7 @@ const routes = [
         path: 'dashboard',
         name: 'dashboard',
         component: () => import('../views/DashboardView.vue'),
-        meta: { title: '概览', phase: 'T1', icon: 'Odometer' },
+        meta: { title: '概览', phase: 'T6', icon: 'Odometer' },
       },
       {
         path: 'jobs',
@@ -46,8 +46,8 @@ const routes = [
         path: 'profile',
         name: 'profile',
         component: () => import('../views/ProfileView.vue'),
-        // 档案部分 T1 已交付，技能自评与证据链在 T3；页面内自行标注，这里按已交付记
-        meta: { title: '技能画像', phase: 'T1', icon: 'User' },
+        // 档案（T1）+ 自评 / 证据 / 项目（T3–T4），页面内按 tab 分组
+        meta: { title: '技能画像', phase: 'T4', icon: 'User' },
       },
       {
         path: 'match/:jobId',
@@ -60,6 +60,19 @@ const routes = [
         name: 'tasks',
         component: () => import('../views/TasksView.vue'),
         meta: { title: '学习计划', phase: 'T5', icon: 'Notebook' },
+      },
+      // 二期：投递清单与面试复盘（各一页，不预留空页）
+      {
+        path: 'applications',
+        name: 'applications',
+        component: () => import('../views/ApplicationsView.vue'),
+        meta: { title: '投递清单', phase: 'T7', icon: 'Briefcase' },
+      },
+      {
+        path: 'interviews',
+        name: 'interviews',
+        component: () => import('../views/InterviewsView.vue'),
+        meta: { title: '面试复盘', phase: 'T8', icon: 'ChatLineSquare' },
       },
     ],
   },

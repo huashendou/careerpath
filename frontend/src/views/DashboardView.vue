@@ -11,12 +11,15 @@ const auth = useAuthStore()
 
 const loading = ref(true)
 const data = ref(null)
+const insights = ref(null)
 const failed = ref(false)
 
 /** 四张统计卡。数字全部来自 /api/stats/overview，没有一条是写死的示例值。 */
 const cards = computed(() => {
   const d = data.value
   if (!d) return []
+  const appTotal = (insights.value?.applicationStatus || []).reduce((sum, item) => sum + item.count, 0)
+  const interviewTotal = (insights.value?.interviewResult || []).reduce((sum, item) => sum + item.count, 0)
   return [
     {
       key: 'jobs',
@@ -50,6 +53,22 @@ const cards = computed(() => {
       hint: d.profileCompleted ? '学校专业已记录' : '补齐后匹配更准',
       to: '/profile',
     },
+    {
+      key: 'applications',
+      label: '投递清单',
+      value: appTotal,
+      unit: '条',
+      hint: appTotal === 0 ? '还没开始投' : '含待投与已结束',
+      to: '/applications',
+    },
+    {
+      key: 'interviews',
+      label: '面试复盘',
+      value: interviewTotal,
+      unit: '场',
+      hint: interviewTotal === 0 ? '面试后记得复盘' : '已记录的场次',
+      to: '/interviews',
+    },
   ]
 })
 
@@ -65,7 +84,12 @@ async function load() {
   loading.value = true
   failed.value = false
   try {
-    data.value = await http.get('/stats/overview')
+    const [overview, dash] = await Promise.all([
+      http.get('/stats/overview'),
+      http.get('/stats/insights').catch(() => null),
+    ])
+    data.value = overview
+    insights.value = dash
   } catch (error) {
     failed.value = true
     ElMessage.error(error.message || '概览数据加载失败')
@@ -73,6 +97,15 @@ async function load() {
     loading.value = false
   }
 }
+
+/** 分数条宽度：0–100 直接映射，null 不画条（「无要求」不是 0 分）。 */
+function barWidth(value) {
+  if (value == null) return 0
+  return Math.max(2, Math.min(100, Number(value)))
+}
+
+const statusText = { todo: '待投', applied: '已投', interview: '面试中', closed: '已结束' }
+const resultText = { pending: '待定', pass: '通过', reject: '未通过' }
 
 onMounted(load)
 </script>
@@ -138,6 +171,66 @@ onMounted(load)
       <el-empty v-else-if="!loading" description="还没有匹配记录">
         <el-button type="primary" @click="router.push('/jobs')">录入第一个岗位</el-button>
       </el-empty>
+    </section>
+
+    <!-- 数据看板（二期模块 9）：不单开页面，趋势与分布直接进概览 -->
+    <section v-if="insights" class="block">
+      <div class="block-head">
+        <h2>数据看板</h2>
+        <span class="cp-muted small">只做已有数据的另一种切法，不额外埋点</span>
+      </div>
+
+      <div class="board">
+        <div class="board-col">
+          <h3 class="board-title">最近匹配分数</h3>
+          <div v-if="insights.matchTrend.length" class="trend">
+            <div v-for="(point, index) in insights.matchTrend" :key="index" class="trend-row">
+              <span class="trend-date cp-num">{{ (point.at || '').slice(5, 10) }}</span>
+              <div class="bar">
+                <div class="bar-fill" :style="{ width: `${barWidth(point.requiredScore)}%` }" />
+                <span v-if="point.requiredScore == null" class="bar-empty">无法算分</span>
+              </div>
+              <span class="trend-score cp-num">{{ point.requiredScore == null ? '—' : Number(point.requiredScore).toFixed(1) }}</span>
+            </div>
+          </div>
+          <p v-else class="cp-muted small">还没有匹配记录</p>
+        </div>
+
+        <div class="board-col">
+          <h3 class="board-title">反复出现的差距</h3>
+          <div v-if="insights.topGaps.length" class="gaps">
+            <div v-for="gap in insights.topGaps" :key="gap.skillId" class="gap">
+              <span class="gap-name">{{ gap.skillName }}</span>
+              <el-tag size="small" type="warning" effect="plain">{{ gap.count }} 个岗位</el-tag>
+            </div>
+          </div>
+          <p v-else class="cp-muted small">没有重复出现的差距</p>
+        </div>
+
+        <div class="board-col">
+          <h3 class="board-title">投递与面试</h3>
+          <div class="chips">
+            <el-tag v-for="item in insights.applicationStatus" :key="item.status" size="small" effect="plain">
+              {{ statusText[item.status] || item.status }} {{ item.count }}
+            </el-tag>
+            <span v-if="!insights.applicationStatus.length" class="cp-muted small">投递清单为空</span>
+          </div>
+          <div class="chips">
+            <el-tag v-for="item in insights.interviewResult" :key="item.result" size="small" type="info" effect="plain">
+              {{ resultText[item.result] || item.result }} {{ item.count }}
+            </el-tag>
+            <span v-if="!insights.interviewResult.length" class="cp-muted small">还没有面试记录</span>
+          </div>
+          <p class="small cp-muted">
+            学习任务完成率：
+            <template v-if="insights.taskCompletion.rate == null">暂无任务</template>
+            <template v-else>
+              <b class="cp-num">{{ insights.taskCompletion.rate }}%</b>
+              （{{ insights.taskCompletion.done }} / {{ insights.taskCompletion.total }}）
+            </template>
+          </p>
+        </div>
+      </div>
     </section>
 
     <p class="disclaimer">
@@ -273,5 +366,94 @@ onMounted(load)
   font-size: 11.5px;
   line-height: 1.6;
   color: var(--cp-text-3);
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+.board-title {
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--cp-text-2);
+}
+
+.trend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--cp-text-3);
+}
+
+.trend-date {
+  width: 42px;
+  flex: none;
+}
+
+.bar {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  background: #f1f2f8;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--cp-primary);
+  border-radius: 4px;
+}
+
+.bar-empty {
+  position: absolute;
+  left: 4px;
+  top: -3px;
+  font-size: 9.5px;
+  color: var(--cp-text-3);
+}
+
+.trend-score {
+  width: 38px;
+  text-align: right;
+  flex: none;
+  color: var(--cp-text-2);
+}
+
+.gaps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.gap-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 </style>

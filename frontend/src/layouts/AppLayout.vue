@@ -7,13 +7,15 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
-// 菜单只放 5 个一级页面；岗位匹配是从岗位解析进入的详情页（c3.1：共 7 个页面）
+// 菜单放 7 个一级页面；岗位匹配是从岗位解析进入的详情页（一期 7 页 + 二期 2 页 = 9 页）
 const menus = [
   { path: '/dashboard', label: '概览', icon: 'Odometer' },
   { path: '/jobs', label: '岗位解析', icon: 'Document' },
   { path: '/skills', label: '技能图谱', icon: 'Share' },
   { path: '/profile', label: '技能画像', icon: 'User' },
   { path: '/tasks', label: '学习计划', icon: 'Notebook' },
+  { path: '/applications', label: '投递清单', icon: 'Briefcase' },
+  { path: '/interviews', label: '面试复盘', icon: 'ChatLineSquare' },
 ]
 
 const activeMenu = computed(() => route.meta.activeMenu || route.path)
