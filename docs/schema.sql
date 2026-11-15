@@ -1,9 +1,9 @@
--- 职航 CareerPath · 建库建表（一期 15 张）
--- 依据：docs/P0-重构方案.md 第四节 + c3.3 范围裁决
+-- 职航 CareerPath · 建库建表（一期 15 张 + 二期 2 张 = 17 张）
+-- 依据：docs/P0-重构方案.md 第四节 + c3.3 范围裁决 + c3.5 二期落地
 -- 执行：mysql -u root -p < docs/schema.sql
--- 说明：模块 2（求职工作台）与模块 8（面试复盘）一期不做，对应 company /
---       application_* / interview_* / question_skill_relation 六张表已裁掉；
---       二期以 2 张新表（applications、interviews）实现简化版，一期不得预留空表。
+-- 说明：一期 15 张不含模块 2/8；二期以 job_application / interview_record 两张表
+--       实现简化版（投递清单 + 面试复盘），不建 company / application_status_log /
+--       interview_question 这类明细表，状态历史直接存 JSON。
 --
 -- 排序规则：MySQL 8.0+ 默认 utf8mb4_0900_ai_ci（UCA 9.0）。此处显式声明，
 -- 避免与建表时继承的默认值不一致——两种 collation 在跨表 JOIN 比较时会报
@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS skill_evidence (
   url           VARCHAR(512) DEFAULT NULL,
   description   TEXT         DEFAULT NULL,
   completeness  TINYINT      NOT NULL DEFAULT 0 COMMENT '材料完整度 0–100',
-  verify_status VARCHAR(16)  NOT NULL DEFAULT 'self' COMMENT 'self / reviewed',
+  verify_status VARCHAR(16)  NOT NULL DEFAULT 'unverified' COMMENT 'unverified / self_verified / pending（与契约 3.4 枚举一致）',
   submitted_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_evidence_user (user_id),
@@ -235,3 +235,47 @@ CREATE TABLE IF NOT EXISTS skill_gap_report (
   UNIQUE KEY uk_gap_result (match_result_id),
   CONSTRAINT fk_gap_result FOREIGN KEY (match_result_id) REFERENCES skill_match_result (id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT '差距报告（与匹配结果一对一）';
+
+-- ---------------------------------------------------------------- 二期：投递与面试
+
+CREATE TABLE IF NOT EXISTS job_application (
+  id              BIGINT       NOT NULL AUTO_INCREMENT,
+  user_id         BIGINT       NOT NULL,
+  job_position_id BIGINT       DEFAULT NULL COMMENT '从岗位解析页投递时带上；岗位删除后置 NULL',
+  company_name    VARCHAR(64)  DEFAULT NULL,
+  title           VARCHAR(64)  NOT NULL COMMENT '冗余岗位名：岗位被删后清单仍可读',
+  status          VARCHAR(16)  NOT NULL DEFAULT 'todo' COMMENT 'todo / applied / interview / closed',
+  status_log      JSON         DEFAULT NULL COMMENT '[{from,to,at}]，简化版不建独立状态历史表',
+  note            VARCHAR(500) DEFAULT NULL,
+  applied_at      DATETIME     DEFAULT NULL COMMENT '首次置为 applied 的时间',
+  created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_app_user_job (user_id, job_position_id),
+  KEY idx_app_user_status (user_id, status),
+  CONSTRAINT fk_app_user FOREIGN KEY (user_id) REFERENCES `user` (id) ON DELETE CASCADE,
+  CONSTRAINT fk_app_job FOREIGN KEY (job_position_id) REFERENCES job_position (id) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT '投递记录（模块 2 简化版）';
+
+CREATE TABLE IF NOT EXISTS interview_record (
+  id              BIGINT       NOT NULL AUTO_INCREMENT,
+  user_id         BIGINT       NOT NULL,
+  application_id  BIGINT       DEFAULT NULL COMMENT '可选：从投递记录发起复盘时带上',
+  job_position_id BIGINT       DEFAULT NULL,
+  company_name    VARCHAR(64)  DEFAULT NULL,
+  job_title       VARCHAR(64)  DEFAULT NULL,
+  interview_date  DATE         DEFAULT NULL,
+  round           VARCHAR(32)  DEFAULT NULL COMMENT '一面 / 二面 / HR 面 …（自由文本）',
+  format          VARCHAR(16)  DEFAULT NULL COMMENT 'phone / video / onsite',
+  questions       JSON         DEFAULT NULL COMMENT '[{question,selfRating,note}]',
+  reflection      TEXT         DEFAULT NULL COMMENT '复盘：哪里答得好、哪里没答上来',
+  result          VARCHAR(16)  NOT NULL DEFAULT 'pending' COMMENT 'pending / pass / reject',
+  related_skills  JSON         DEFAULT NULL COMMENT '["java-basic", …]，用于把复盘关联回能力模型',
+  created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_interview_user (user_id, interview_date),
+  CONSTRAINT fk_interview_user FOREIGN KEY (user_id) REFERENCES `user` (id) ON DELETE CASCADE,
+  CONSTRAINT fk_interview_app FOREIGN KEY (application_id) REFERENCES job_application (id) ON DELETE SET NULL,
+  CONSTRAINT fk_interview_job FOREIGN KEY (job_position_id) REFERENCES job_position (id) ON DELETE SET NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT '面试记录与复盘（模块 8 简化版）';

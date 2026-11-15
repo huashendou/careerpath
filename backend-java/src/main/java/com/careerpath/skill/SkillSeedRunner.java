@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,13 +38,15 @@ public class SkillSeedRunner implements ApplicationRunner {
     private final SkillCategoryMapper categoryMapper;
     private final SkillMapper skillMapper;
     private final ObjectMapper objectMapper;
+    private final JdbcTemplate jdbc;
 
     public SkillSeedRunner(SeedProperties properties, SkillCategoryMapper categoryMapper,
-                           SkillMapper skillMapper, ObjectMapper objectMapper) {
+                           SkillMapper skillMapper, ObjectMapper objectMapper, JdbcTemplate jdbc) {
         this.properties = properties;
         this.categoryMapper = categoryMapper;
         this.skillMapper = skillMapper;
         this.objectMapper = objectMapper;
+        this.jdbc = jdbc;
     }
 
     @Override
@@ -63,7 +66,8 @@ public class SkillSeedRunner implements ApplicationRunner {
             JsonNode root = objectMapper.readTree(path.toFile());
             int categories = seedCategories(root.path("dimensions"));
             int skills = seedSkills(root.path("skills"));
-            log.info("技能种子导入完成：{} 类 / {} 技能（{}）", categories, skills, path);
+            int relations = seedRelations(path);
+            log.info("技能种子导入完成：{} 类 / {} 技能 / {} 条关系（{}）", categories, skills, relations, path);
         } catch (IOException ex) {
             log.error("读取技能种子失败：{}", path, ex);
         }
@@ -152,5 +156,51 @@ public class SkillSeedRunner implements ApplicationRunner {
         }
         log.debug("技能 upsert：新增 {} / 更新 {}", inserted, updated);
         return rows.size();
+    }
+
+    /**
+     * 技能关系种子（{@code data/skill-relations.json}，与 skills.json 同目录）。
+     *
+     * <p>单独一个文件而不是塞进 skills.json：Python 侧只读技能清单，多一个并列数组会让
+     * 「词典结构」和「关系图」两件事挤在同一个 schema 里，改一边要重新校验另一边。
+     *
+     * <p>幂等靠唯一索引 + {@code INSERT IGNORE}；端点两端都先在内存里校验存在性——
+     * 外键错误不会被 IGNORE 吞掉，一条坏数据会让整个启动失败。
+     */
+    private int seedRelations(Path skillsPath) {
+        Path parent = skillsPath.getParent();
+        Path file = parent == null ? Path.of("skill-relations.json") : parent.resolve("skill-relations.json");
+        if (!Files.isRegularFile(file)) {
+            log.warn("技能关系种子不存在：{}，跳过（关系图为空不影响解析）", file);
+            return 0;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(file.toFile());
+            Set<String> known = new HashSet<>(jdbc.queryForList("SELECT id FROM skill", String.class));
+            int added = 0;
+            int skipped = 0;
+            for (JsonNode node : root.path("relations")) {
+                String from = node.path("from").asText();
+                String to = node.path("to").asText();
+                String type = node.path("type").asText();
+                if (!known.contains(from) || !known.contains(to)
+                        || !Set.of("prerequisite", "related", "ecosystem").contains(type)) {
+                    log.warn("跳过非法技能关系：{} -[{}]-> {}", from, type, to);
+                    skipped++;
+                    continue;
+                }
+                added += jdbc.update("""
+                        INSERT IGNORE INTO skill_relation (from_skill_id, to_skill_id, relation_type)
+                        VALUES (?, ?, ?)
+                        """, from, to, type);
+            }
+            if (skipped > 0) {
+                log.warn("技能关系：{} 条非法已跳过", skipped);
+            }
+            return added;
+        } catch (IOException ex) {
+            log.error("读取技能关系种子失败：{}", file, ex);
+            return 0;
+        }
     }
 }
