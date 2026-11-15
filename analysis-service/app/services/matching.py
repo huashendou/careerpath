@@ -1,19 +1,25 @@
-"""匹配与差距分析（core-only 口径）。
+"""匹配与差距分析（required-only 口径 + 证据独立展示）。
 
-这是全项目唯一一份算分实现，前端不得再写一份。
+这是全项目**唯一一份**算分实现：Java 主服务不得自己再算一遍，前端也不得复算。
 
 设计约束：
 1. **纯函数**：不查库、不读全局状态、不写文件。输入岗位要求与自评，输出结果字典。
    pytest 才能在不起数据库的情况下验完全部规则。
-2. **plus 完全退出分子分母**：加分项的定义是「没有也能干」，把它算进分母等于把
+2. **加分项完全退出分子分母**：bonus 的定义是「没有也能干」，把它算进分母等于把
    「没有也能干」变成「没有就扣分」，自相矛盾。
-3. **anyOf 只计一次**：Vue / React 二选一，取高者，权重只加一次；缺口也只出一条。
-4. **空维返回 None，不返回 0**：某维度没有 core 要求时，0 会被读成「要求为零」，
+3. **证据不进分数**（用户 2026-11-15 裁决）：`requiredScore` 只由自评等级决定；
+   证据只出 `evidenceCoverage` 与 `hasEvidence` 标记。理由同上——没上传材料就扣分，
+   与「加分项进分母」是同一种错误。
+4. **anyOf 只计一次**：Vue / React 二选一，取高者，权重只加一次；缺口也只出一条。
+5. **空维返回 None，不返回 0**：某维度没有 required 要求时，0 会被读成「要求为零」，
    真实含义是「本岗位不把它当核心要求」。
-5. **无法算分不抛异常**：返回 `matchScore=None` + `status`，这是业务结论不是错误。
-   抛 4xx 会迫使前端把「正常结论」和「请求写错了」混在一个分支里处理。
+6. **无法算分不抛异常**：返回 `matchScore=None` + `status`，这是业务结论不是错误。
 
-口径依据：`docs/P0-数据模型设计.md` 第六节；字段对应：`docs/协作看板.md` 3.5。
+公式：`requiredScore = Σ_req(W×min(L,T)) / Σ_req(W×T) × 100`
+与《整体介绍》`Σ(W×Mi)/ΣW`（`Mi` 为归一化掌握度）数学等价，此处选分母写法是为了
+直接把 `numerator`/`denominator` 暴露给界面，让「分母不是 100」这条能一眼核对。
+
+口径依据：`docs/P0-重构方案.md` 第五节。
 """
 
 from __future__ import annotations
@@ -29,21 +35,24 @@ logger = logging.getLogger(__name__)
 LEVEL_MIN = 0
 LEVEL_MAX = 5
 
-CORE = "core"
-PLUS = "plus"
+# 兼容两种叫法：v1 数据用 core/plus，v2 库表用 required/bonus
+REQUIRED = "required"
+BONUS = "bonus"
+_CORE_ALIASES = {"required", "core"}
+_BONUS_ALIASES = {"bonus", "plus"}
 
 STATUS_MISSING = "missing"
 STATUS_WEAK = "weak"
 STATUS_MASTERED = "mastered"
 
-# 整体结论三态
 OK = "ok"
 NO_CORE_REQUIREMENT = "NO_CORE_REQUIREMENT"
 EMPTY_PROFILE = "EMPTY_PROFILE"
 
-# plus 两态
-PLUS_MASTERED = "mastered"
-PLUS_PENDING = "pending"
+BONUS_MASTERED = "mastered"
+BONUS_PENDING = "pending"
+
+ALGORITHM_VERSION = "v2.0-required-only"
 
 
 def clamp_level(value: Any) -> int:
@@ -76,6 +85,10 @@ def effective_level(req: Mapping[str, Any], ratings: Mapping[str, Any]) -> int:
     return level
 
 
+def _is_bonus(req_type: Any) -> bool:
+    return str(req_type or REQUIRED).lower() in _BONUS_ALIASES
+
+
 def normalize_requirements(
     requirements: Iterable[Mapping[str, Any]],
     skills: Mapping[str, Mapping[str, Any]],
@@ -84,28 +97,33 @@ def normalize_requirements(
 ) -> list[dict[str, Any]]:
     """清洗要求列表：去重（保留首条）、丢弃引用不存在的技能、丢弃 target<=0 的条目。
 
-    这些在 seed 阶段就该校验失败；运行期再兜一层，保证不会因为一条脏数据让整页崩掉。
+    统一键名为内部形态（`target` / `type`），并接受 `targetLevel` / `reqType` 两种入参写法，
+    这样 v1 的回归用例与 v2 的库表字段能共用同一份算法。
 
-    丢弃**必须留日志**：静默跳过会让「岗位少了一条要求」这件事在结果里看不出来，
-    分母悄悄变小也没人知道。`job_id` 只为日志可定位而传，不影响算分。
+    丢弃**必须留日志**：静默跳过会让「岗位少了一条要求」在结果里看不出来，
+    分母悄悄变小也没人知道。
     """
     seen: set[str] = set()
     cleaned: list[dict[str, Any]] = []
     for raw in requirements:
-        skill_id = raw["skillId"]
+        skill_id = raw.get("skillId") or raw.get("skill_id")
+        if not skill_id:
+            logger.warning("算分跳过缺少 skillId 的要求：job=%s", job_id)
+            continue
         if skill_id in seen:
             logger.warning("算分跳过重复要求：job=%s skillId=%s", job_id, skill_id)
             continue
         if skill_id not in skills:
             logger.warning("算分跳过未知技能：job=%s skillId=%s", job_id, skill_id)
             continue
-        target = int(raw.get("target") or 0)
+        target_raw = raw.get("target", raw.get("targetLevel"))
+        target = int(target_raw or 0)
         if target <= 0:
             logger.warning(
                 "算分跳过目标等级非正的要求：job=%s skillId=%s target=%s",
                 job_id,
                 skill_id,
-                raw.get("target"),
+                target_raw,
             )
             continue
         seen.add(skill_id)
@@ -114,8 +132,8 @@ def normalize_requirements(
                 "skillId": skill_id,
                 "weight": int(raw.get("weight") or 0),
                 "target": target,
-                "type": raw.get("type", CORE),
-                "anyOf": list(raw.get("anyOf") or []),
+                "type": BONUS if _is_bonus(raw.get("type", raw.get("reqType"))) else REQUIRED,
+                "anyOf": list(raw.get("anyOf") or raw.get("any_of") or []),
             }
         )
     return cleaned
@@ -127,11 +145,11 @@ def _round(value: float, quantum: str) -> float:
 
 
 def _core_items(items: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    return [r for r in items if r["type"] == CORE]
+    return [r for r in items if r["type"] == REQUIRED]
 
 
-def _plus_items(items: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    return [r for r in items if r["type"] == PLUS]
+def _bonus_items(items: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return [r for r in items if r["type"] == BONUS]
 
 
 def _status(current: int, target: int) -> str:
@@ -142,10 +160,8 @@ def _status(current: int, target: int) -> str:
     return STATUS_MASTERED
 
 
-def _core_totals(
-    core: Sequence[Mapping[str, Any]], ratings: Mapping[str, Any]
-) -> tuple[int, int]:
-    """返回 (分子, 分母)。只有 core 参与，plus 一个都不加。"""
+def _totals(core: Sequence[Mapping[str, Any]], ratings: Mapping[str, Any]) -> tuple[int, int]:
+    """返回 (分子, 分母)。只有 required 参与，bonus 一个都不加。"""
     numerator = 0
     denominator = 0
     for req in core:
@@ -154,10 +170,32 @@ def _core_totals(
     return numerator, denominator
 
 
+def _evidence_strength(evidence: Mapping[str, Any], skill_id: str) -> int:
+    """某技能的证据强度 0–100。没有证据记为 0，**但这不参与算分**。"""
+    raw = evidence.get(skill_id)
+    if raw is None:
+        return 0
+    try:
+        return max(0, min(100, int(raw)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _evidence_coverage(
+    core: Sequence[Mapping[str, Any]], evidence: Mapping[str, Any]
+) -> dict[str, Any]:
+    """证据覆盖面：只统计 required 技能，缺席证据不影响任何分数。"""
+    total = len(core)
+    covered = sum(1 for r in core if _evidence_strength(evidence, r["skillId"]) > 0)
+    percent = _round(covered / total * 100, "0.01") if total else None
+    return {"coveredCount": covered, "totalCount": total, "coverage": percent}
+
+
 def _gap_items(
     core: Sequence[Mapping[str, Any]],
     ratings: Mapping[str, Any],
     skills: Mapping[str, Mapping[str, Any]],
+    evidence: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     """只收 gap>0 的项。已掌握的技能不进「能力差距」列表——它不是差距。
 
@@ -173,6 +211,7 @@ def _gap_items(
         if gap <= 0:
             continue
         skill = skills[req["skillId"]]
+        strength = _evidence_strength(evidence, req["skillId"])
         items.append(
             {
                 "skillId": req["skillId"],
@@ -185,21 +224,23 @@ def _gap_items(
                 "gap": gap,
                 "priority": req["weight"] * gap,
                 "status": STATUS_MISSING if effective <= 0 else STATUS_WEAK,
+                "hasEvidence": strength > 0,
+                "evidenceStrength": strength,
             }
         )
     items.sort(key=lambda x: (-x["priority"], -x["weight"], x["skillId"]))
     return items
 
 
-def _plus_items_out(
-    plus: Sequence[Mapping[str, Any]],
+def _bonus_items_out(
+    bonus: Sequence[Mapping[str, Any]],
     ratings: Mapping[str, Any],
     skills: Mapping[str, Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     """加分项清单：只有 mastered / pending 两态，不参与任何百分比。"""
     mastered: list[dict[str, Any]] = []
     pending: list[dict[str, Any]] = []
-    for req in plus:
+    for req in bonus:
         level = effective_level(req, ratings)
         skill = skills[req["skillId"]]
         base = {
@@ -211,9 +252,10 @@ def _plus_items_out(
             "level": level,
         }
         if level >= req["target"]:
-            mastered.append({**base, "status": PLUS_MASTERED})
+            mastered.append({**base, "status": BONUS_MASTERED})
         else:
-            pending.append({**base, "status": PLUS_PENDING, "_rank": req["weight"] * (req["target"] - level)})
+            rank = req["weight"] * (req["target"] - level)
+            pending.append({**base, "status": BONUS_PENDING, "_rank": rank})
 
     mastered.sort(key=lambda x: (-x["weight"], x["skillId"]))
     pending.sort(key=lambda x: (-x["_rank"], -x["weight"], x["skillId"]))
@@ -228,7 +270,7 @@ def _radar(
     dimensions: Sequence[Mapping[str, str]],
     skills: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
-    """六维雷达。目标线与当前线必须用同一组 core 权重，否则两条线不可比。"""
+    """六维雷达。目标线与当前线必须用同一组 required 权重，否则两条线不可比。"""
     axes: list[dict[str, Any]] = []
     data_axis_count = 0
     for dim in dimensions:
@@ -246,8 +288,21 @@ def _radar(
             )
             continue
 
-        data_axis_count += 1
         weight_sum = sum(r["weight"] for r in in_dim)
+        if weight_sum <= 0:  # 权重全为 0 的退化维度：按空轴处理，不除零
+            axes.append(
+                {
+                    "dim": dim["id"],
+                    "name": dim["name"],
+                    "target": None,
+                    "current": None,
+                    "hasCore": False,
+                    "coreWeight": 0,
+                }
+            )
+            continue
+
+        data_axis_count += 1
         target = sum(r["weight"] * r["target"] for r in in_dim) / weight_sum
         current = sum(r["weight"] * effective_level(r, ratings) for r in in_dim) / weight_sum
         axes.append(
@@ -265,60 +320,76 @@ def _radar(
 
 def analyze(
     *,
-    job_id: str,
+    job_id: Any,
     job_name: str,
     requirements: Sequence[Mapping[str, Any]],
     ratings: Mapping[str, Any],
     skills: Mapping[str, Mapping[str, Any]],
     dimensions: Sequence[Mapping[str, str]],
+    evidence: Mapping[str, Any] | None = None,
     data_version: str = "示例数据 v0.1",
     disclaimer: str = "",
-    scoring_version: str = "v0.2-core-only",
-    profile_id: int | None = None,
+    scoring_version: str = ALGORITHM_VERSION,
+    user_id: Any = None,
 ) -> dict[str, Any]:
-    """算分入口。返回结构与看板 3.5 的 MatchResult 逐字段一致。"""
-    cleaned = normalize_requirements(requirements, skills, job_id=job_id)
+    """算分入口。返回结构与看板 3.3 的 MatchResult 逐字段一致。"""
+    evidence = evidence or {}
+    cleaned = normalize_requirements(requirements, skills, job_id=str(job_id))
     core = _core_items(cleaned)
-    plus = _plus_items(cleaned)
+    bonus = _bonus_items(cleaned)
 
-    numerator, denominator = _core_totals(core, ratings)
-    gaps = _gap_items(core, ratings, skills)
-    plus_items = _plus_items_out(plus, ratings, skills)
+    numerator, denominator = _totals(core, ratings)
+    gaps = _gap_items(core, ratings, skills, evidence)
+    bonus_items = _bonus_items_out(bonus, ratings, skills)
+    coverage = _evidence_coverage(core, evidence)
 
-    # 三种状态的判定顺序有讲究：岗位本身不可算（无 core）比「用户还没自评」更根本，
+    # 三种状态的判定顺序有讲究：岗位本身不可算（无 required）比「用户还没自评」更根本，
     # 换任何画像结论都一样，所以先报 NO_CORE_REQUIREMENT。
     if denominator == 0:
         status = NO_CORE_REQUIREMENT
-        match_score = None
+        required_score = None
     elif not ratings:
         status = EMPTY_PROFILE
-        match_score = None
+        required_score = None
     else:
         status = OK
-        match_score = _round(numerator / denominator * 100, "0.0001")
+        required_score = _round(numerator / denominator * 100, "0.0001")
 
-    core_counts = {STATUS_MASTERED: 0, STATUS_WEAK: 0, STATUS_MISSING: 0}
+    bonus_numerator, bonus_denominator = _totals(bonus, ratings)
+    bonus_score = (
+        _round(bonus_numerator / bonus_denominator * 100, "0.0001")
+        if bonus_denominator
+        else None
+    )
+
+    counts = {STATUS_MASTERED: 0, STATUS_WEAK: 0, STATUS_MISSING: 0}
     for req in core:
-        core_counts[_status(effective_level(req, ratings), req["target"])] += 1
+        counts[_status(effective_level(req, ratings), req["target"])] += 1
 
     return {
         "jobId": job_id,
         "jobName": job_name,
-        "profileId": profile_id,
-        "matchScore": match_score,
+        "userId": user_id,
+        "matchScore": required_score,
+        "bonusScore": bonus_score,
         "status": status,
         "numerator": numerator,
         "denominator": denominator,
+        "bonusNumerator": bonus_numerator,
+        "bonusDenominator": bonus_denominator,
+        "evidenceCoverage": coverage["coverage"],
         "counts": {
-            "mastered": core_counts[STATUS_MASTERED],
-            "weak": core_counts[STATUS_WEAK],
-            "missing": core_counts[STATUS_MISSING],
-            "plusMastered": sum(1 for i in plus_items if i["status"] == PLUS_MASTERED),
-            "plusPending": sum(1 for i in plus_items if i["status"] == PLUS_PENDING),
+            "mastered": counts[STATUS_MASTERED],
+            "weak": counts[STATUS_WEAK],
+            "missing": counts[STATUS_MISSING],
+            "plusMastered": sum(1 for i in bonus_items if i["status"] == BONUS_MASTERED),
+            "plusPending": sum(1 for i in bonus_items if i["status"] == BONUS_PENDING),
+            "evidenceCovered": coverage["coveredCount"],
+            "requiredTotal": coverage["totalCount"],
         },
         "gaps": gaps,
         "topActions": [g["skillId"] for g in gaps[:3]],
-        "plusItems": plus_items,
+        "plusItems": bonus_items,
         "radar": _radar(core, ratings, dimensions, skills),
         "meta": {
             "scoringVersion": scoring_version,

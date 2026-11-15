@@ -1,17 +1,11 @@
-# 后端依赖（Python 3.14）
-# 安装：pip install -r requirements.txt
-# 说明：PyMySQL 走纯 Python 实现，不需要 mysqlclient 的编译链；
-#       cryptography 是必需的——MySQL 8/9 默认 caching_sha2_password 认证依赖它。
+# 分析服务依赖（Python 3.12+）
+# 安装：py -m pip install -r requirements.txt
+# v3 起本服务不连数据库、不做鉴权，故不再依赖 SQLAlchemy / PyMySQL / PyJWT / bcrypt。
 
 fastapi>=0.115
 uvicorn[standard]>=0.30
-sqlalchemy>=2.0
 pydantic>=2.9
 pydantic-settings>=2.4
-pymysql>=1.1
-cryptography>=43
-PyJWT>=2.9
-bcrypt>=4.2
 
 # 开发与测试
 pytest>=8.3

@@ -32,3 +32,12 @@ uploads/
 # 本地 SQLite 兜底文件
 *.db
 *.db-journal
+
+# 废弃草案归档（含旧脚手架与已被 v3.0 取代的方案文档，仅本地留存）
+.trash/
+
+# Java / Maven
+target/
+build/
+*.class
+*.jar
