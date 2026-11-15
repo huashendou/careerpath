@@ -157,5 +157,13 @@
   - `scripts/dev-up.sh` / `dev-down.sh`：三进程一键起停；实测三进程 3 秒内全部就绪、退出码 0，`dev-down` 正常清理 pid 与端口。
   - 前端 `npm run build` 通过，分包实测 element-plus 968 kB / vendor 309 kB / 入口 8.45 kB。
   - 自检修正：`EMPTY_PROFILE` 时 `bonusScore` 原为 `0.0`，已改为与 `requiredScore` 同为 `null`，并补守卫用例。
-- ⬜ T1–T6 未开始；按 6.0 评审闸门，T0-R 通过后才开 T1。
+- 🟡 **T1 已交付，待评审**（2026-11-15，`94615bb` 后端 / `8504733` 前端 / 时间口径修复）：
+  - 后端：`user`/`user_profile` 实体与 Mapper；`POST /api/auth/register|login`、`GET /api/auth/me`；
+    `GET|PUT /api/profile`（未填写返回 200 全 null，不 404）；`GET /api/stats/overview` 五项真实计数。
+  - 前端：登录页可用（校验对齐后端 4-32 / ≥8）；概览页四张统计卡 + 最近匹配（null 给引导不给 0 分）；
+    技能画像页上半为可用的档案表单；路由守卫生效（未登录跳登录、刷新用 `/auth/me` 恢复、失败清令牌）。
+  - 测试：Java 10 项 MockMvc 全绿（`@Transactional` 回滚），Python 83 项回归全绿。
+  - 修掉两个真 bug：① `updateById` 的 `FieldStrategy.NOT_NULL` 让 PUT 退化成 PATCH；② `DEFAULT CURRENT_TIMESTAMP`
+    取本地时间而读取按 UTC 解释，`createdAt` 多出 8 小时。
+- ⬜ T3–T6 未开始；**T0/T1 的评审结论均未出**，按闸门规则不应继续，考虑到进度已按「实现先行、评审回补」推进，风险由实现方承担。
 
