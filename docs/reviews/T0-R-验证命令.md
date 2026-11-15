@@ -24,19 +24,14 @@ curl -s --noproxy '*' -w '\nHTTP %{http_code}\n' http://127.0.0.1:8080/api/profi
 **A2 无 snake_case 泄漏**
 
 ```bash
-curl -s --noproxy '*' http://127.0.0.1:8080/api/health | grep -o '"[a-z]*_[a-z]*"' | head
+curl -s --noproxy '*' http://127.0.0.1:8080/api/health | grep -oE '"[a-z]+(_[a-z]+)+"[[:space:]]*:'
 ```
 期望：无输出。
+注意只匹配**键名**（后跟冒号）。早先版本用 `grep '"[a-z]*_[a-z]*"'` 会命中值里的 `career_path`，属假阳性（T0-R-P2-2）。
 
-**A3 `anyOf` 恒为数组**
+**A3 `anyOf` 恒为数组** —— 本轮 N/A，验点写错了
 
-```bash
-TOKEN=$(grep '^INTERNAL_TOKEN=' .env | cut -d= -f2- | tr -d '\r')
-curl -s --noproxy '*' -H "X-Internal-Token: $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"text":"熟悉 Java 与 Spring Boot，了解 Redis 者优先","jobTitle":"后端实习"}' \
-  http://127.0.0.1:8000/internal/parse/jd | python -c "import json,sys;d=json.load(sys.stdin);print([r['anyOf'] for r in d['requirements']])"
-```
-期望：每个元素都是 `[]`，不是 `None`。
+`/internal/parse/jd` 的响应契约里本来就没有 `anyOf` 字段（见看板 3.3），它是 `job_skill_requirement` 表与 `GET/PUT /api/jobs/{id}/requirements` 的字段。T0 没有该接口，本轮跳过；T3 验收时按看板 6.2 验「`anyOf` 只计一次、成员不独立出现」。
 
 **A5 分页** —— 本轮 N/A（T0 无分页接口，T3 起验）。
 **A4 时间格式 / A6 无总分字段** —— 见 `T0-自检报告.md` 第五节，T0 无业务时间字段；`/internal/match` 返回中只有 `requiredScore` 与 `bonusScore`，无 `totalScore` / `matchScore`。
