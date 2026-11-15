@@ -1,11 +1,16 @@
--- 职航 CareerPath · 建库建表（15 张）
--- 依据：docs/P0-重构方案.md 第四节
+-- 职航 CareerPath · 建库建表（一期 15 张）
+-- 依据：docs/P0-重构方案.md 第四节 + c3.3 范围裁决
 -- 执行：mysql -u root -p < docs/schema.sql
--- 说明：模块 2（求职工作台）与模块 8（面试复盘）按 2026-11-15 范围裁决不做，
---       对应 company / application_* / interview_* / question_skill_relation 六张表已裁掉。
+-- 说明：模块 2（求职工作台）与模块 8（面试复盘）一期不做，对应 company /
+--       application_* / interview_* / question_skill_relation 六张表已裁掉；
+--       二期以 2 张新表（applications、interviews）实现简化版，一期不得预留空表。
+--
+-- 排序规则：MySQL 8.0+ 默认 utf8mb4_0900_ai_ci（UCA 9.0）。此处显式声明，
+-- 避免与建表时继承的默认值不一致——两种 collation 在跨表 JOIN 比较时会报
+-- "Illegal mix of collations"，且 emoji / 异体字排序结果不同。
 
 CREATE DATABASE IF NOT EXISTS career_path
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 USE career_path;
 
 -- ---------------------------------------------------------------- 用户
