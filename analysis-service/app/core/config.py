@@ -42,8 +42,11 @@ class Settings(BaseSettings):
     # 技能词典种子。Java 侧用同一个文件灌库，两进程读到的是同一份数据。
     skills_file: str = "data/skills.json"
 
-    # 单次解析允许的最大文本长度，防止超长文本把进程打满
-    max_text_length: int = 200_000
+    # 单次解析允许的最大文本长度，防止超长文本把进程打满。
+    # 原值 200_000 是按「整段原始 JD」估的，但一份 JD 极少超过 5_000 字，
+    # 20 万字符的上限等于没设——超长文本照样整段进正则。
+    # 收到 20_000 字符（中文约 60 KB UTF-8），覆盖正常长 JD，又不给正则留可乘之机。
+    max_text_length: int = 20_000
 
     @property
     def skills_path(self) -> Path:
