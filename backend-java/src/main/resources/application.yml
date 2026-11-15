@@ -1,0 +1,62 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: careerpath-api
+  # 从项目根的 .env 读数据库口令与内部密钥（.env 已 gitignore，仓库里只有 .env.example）。
+  # 同时尝试 ../.env 与 ./.env：前者对应「在 backend-java 下启动」，后者对应「在项目根启动」。
+  # optional: 找不到也不报错，CI 里用真实环境变量注入即可。
+  config:
+    import: optional:file:../.env[.properties],optional:file:./.env[.properties]
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:career_path}?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 5000
+      pool-name: careerpath-pool
+  jackson:
+    time-zone: UTC
+    # 刻意不设 default-property-inclusion=non_null：契约要求「无必备要求」时显式返回 null，
+    # 而不是把字段吞掉——前端靠字段存在与否区分「没这项」和「这项没值」会写错分支。
+    serialization:
+      write-dates-as-timestamps: false
+  mvc:
+    problemdetails:
+      # 错误体统一走 {detail:{code,message}}，不启用 RFC 7807
+      enabled: false
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    # 打开后能在日志里看到真实 SQL，联调期很有用；生产应关掉
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      table-underline: true
+
+app:
+  jwt:
+    # 开发占位密钥，长度必须 >= 32 字节；.env 里的 JWT_SECRET 会覆盖它
+    secret: ${JWT_SECRET:careerpath-dev-only-jwt-secret-do-not-use-in-prod}
+    expire-minutes: ${JWT_EXPIRE_MINUTES:1440}
+  internal:
+    base-url: ${ANALYSIS_BASE_URL:http://127.0.0.1:8000}
+    token: ${INTERNAL_TOKEN:careerpath-local-key}
+    timeout-ms: 1500
+  seed:
+    # 启动时把 data/skills.json 幂等灌库；生产建议关掉，改由发布流水线执行
+    enabled: ${SEED_ENABLED:true}
+    # 相对**项目根**的路径；启动时会依次尝试 ./ 与 ../ 两级，兼容根目录和 backend-java 两种工作目录
+    skills-file: ${SKILLS_FILE:data/skills.json}
+
+logging:
+  level:
+    root: INFO
+    com.careerpath: DEBUG
