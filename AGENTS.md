@@ -145,6 +145,8 @@
   - `analysis-service/`：`/internal/health`、`/internal/parse/jd`、`/internal/match` 三个内部接口，共享密钥校验；算分按 required-only 口径（证据不进分数），83 项 pytest 全绿。
   - 数据库：`career_path`（utf8mb4），**15 张表**，`scripts/init_db.py` 幂等建库。
   - `frontend/`：Vue 3 + Element Plus，9 → **7 个页面**路由骨架，`/api` 代理 8080。
-  - `scripts/dev-up.sh` / `dev-down.sh`：三进程一键起停，实测两个 health 均 200。
+  - `scripts/dev-up.sh` / `dev-down.sh`：三进程一键起停；实测三进程 3 秒内全部就绪、退出码 0，`dev-down` 正常清理 pid 与端口。
+  - 前端 `npm run build` 通过，分包实测 element-plus 968 kB / vendor 309 kB / 入口 8.45 kB。
+  - 自检修正：`EMPTY_PROFILE` 时 `bonusScore` 原为 `0.0`，已改为与 `requiredScore` 同为 `null`，并补守卫用例。
 - ⬜ T1–T6 未开始；按 6.0 评审闸门，T0-R 通过后才开 T1。
 
