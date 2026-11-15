@@ -52,7 +52,9 @@ public class ProfileService {
         entity.setTargetCity(trimToNull(request.targetCity()));
         entity.setPhone(trimToNull(request.phone()));
         entity.setEmail(trimToNull(request.email()));
-        entity.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+        // 截到秒：MySQL DATETIME 默认精度是 0，写纳秒会在读回时被静默截断，
+        // 让「写入值」与「读回值」对不上，排查时白费时间
+        entity.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC).withNano(0));
 
         if (created) {
             profileMapper.insert(entity);

@@ -69,6 +69,10 @@ public class AuthService {
         user.setUsername(username);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setRole(DEFAULT_ROLE);
+        // 显式写 UTC 时间戳，不用列的 DEFAULT CURRENT_TIMESTAMP：那个默认值取的是 MySQL
+        // 服务器本地时间（UTC+8），而读取时按 UTC 解释，createdAt 会凭空多出 8 小时。
+        // 库里的 DATETIME 一律当 UTC 存，这是全项目唯一的时间口径。
+        user.setCreatedAt(LocalDateTime.now(ZoneOffset.UTC).withNano(0));
         try {
             userMapper.insert(user);
         } catch (DuplicateKeyException ex) {
