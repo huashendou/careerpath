@@ -1,12 +1,6 @@
 <script setup>
 import { reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { useAuthStore } from '../stores/auth'
-
-const auth = useAuthStore()
-const router = useRouter()
-const route = useRoute()
 
 const mode = ref('login')
 const loading = ref(false)
@@ -29,15 +23,11 @@ async function submit() {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
 
+  // T0 只有表单与校验，后端 /api/auth/* 尚未实现（现返回 404）。
+  // 这里如实告知，不伪造「登录成功」，也不跳转——否则评审会以为鉴权已通。
   loading.value = true
   try {
-    if (mode.value === 'login') await auth.login(form.username, form.password)
-    else await auth.register(form.username, form.password)
-    ElMessage.success(mode.value === 'login' ? '登录成功' : '注册成功')
-    router.replace(route.query.redirect || '/dashboard')
-  } catch (error) {
-    // 账号体系在 T1 落地；此刻后端返回 401/404 属预期，如实提示而不是假装成功
-    ElMessage.error(error.message || '操作失败')
+    ElMessage.info('账号体系在 T1 交付：当前仅完成表单与前端校验，后端接口尚未实装')
   } finally {
     loading.value = false
   }

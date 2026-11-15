@@ -1,11 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
 const router = useRouter()
-const auth = useAuthStore()
 
 // 菜单只放 5 个一级页面；岗位匹配是从岗位解析进入的详情页（c3.1：共 7 个页面）
 const menus = [
@@ -18,11 +16,6 @@ const menus = [
 
 const activeMenu = computed(() => route.meta.activeMenu || route.path)
 const pageTitle = computed(() => route.meta.title || '职航 CareerPath')
-
-function signOut() {
-  auth.logout()
-  router.push({ name: 'login' })
-}
 </script>
 
 <template>
@@ -58,20 +51,8 @@ function signOut() {
           </el-tag>
         </div>
         <div class="header-right">
-          <template v-if="auth.isLoggedIn">
-            <el-dropdown trigger="click">
-              <span class="user">
-                <el-avatar :size="26">{{ (auth.displayName || 'U').slice(0, 1).toUpperCase() }}</el-avatar>
-                <span class="user-name">{{ auth.displayName || '同学' }}</span>
-              </span>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item @click="signOut">退出登录</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </template>
-          <el-button v-else text type="primary" @click="router.push('/login')">登录 / 注册</el-button>
+          <!-- T0 无会话：不显示用户名/退出登录，避免与「未实现鉴权」自相矛盾 -->
+          <el-button text type="primary" @click="router.push('/login')">登录 / 注册</el-button>
         </div>
       </el-header>
 
@@ -182,19 +163,6 @@ function signOut() {
 .header-right {
   display: flex;
   align-items: center;
-}
-
-.user {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  outline: none;
-}
-
-.user-name {
-  font-size: 13px;
-  color: var(--cp-text-2);
 }
 
 .main {

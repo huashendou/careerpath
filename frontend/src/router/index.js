@@ -6,11 +6,11 @@
 // 页面清单：登录 / 概览 / 岗位解析 / 技能图谱 / 技能画像 / 岗位匹配 / 学习计划。
 // 岗位匹配是详情页（从岗位解析进入），因此侧边菜单只有 5 项。
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
 import AppLayout from '../layouts/AppLayout.vue'
 
-// T1 已交付账号体系，拦截开启。改回 false 只应发生在调试单个页面时，且不得提交。
-const AUTH_ENFORCED = true
+// T0 是骨架阶段：登录接口尚未实现，因此不做登录拦截，7 个页面可直接打开供评审。
+// T1 交付账号体系后，在这里加 beforeEach 守卫（未登录 → /login?redirect=），
+// 并把 AppLayout 的用户菜单与 LoginView 的提交逻辑接上 auth store。
 
 const routes = [
   {
@@ -69,36 +69,6 @@ const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior: () => ({ top: 0 }),
-})
-
-router.beforeEach(async (to) => {
-  const auth = useAuthStore()
-
-  if (!AUTH_ENFORCED) return true
-
-  // 已登录还去登录页：直接送回概览，否则用户会在登录页反复提交
-  if (to.meta.guest && auth.isLoggedIn) {
-    return { name: 'dashboard' }
-  }
-
-  if (to.meta.guest) return true
-
-  if (!auth.isLoggedIn) {
-    return { name: 'login', query: { redirect: to.fullPath } }
-  }
-
-  // 有令牌但没用户信息（刷新页面后内存被清空）：先补一次 /auth/me
-  // 失败说明令牌已失效，清掉并回登录页——不能放着不管，否则每个页面都会各自 401 一次
-  if (!auth.user) {
-    try {
-      await auth.fetchMe()
-    } catch {
-      auth.logout()
-      return { name: 'login', query: { redirect: to.fullPath } }
-    }
-  }
-
-  return true
 })
 
 router.afterEach((to) => {
