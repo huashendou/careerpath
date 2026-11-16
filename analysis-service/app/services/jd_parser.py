@@ -50,6 +50,11 @@ REQUIRED_WORDS = (
     "精通",
 )
 
+# 段落标题：只用于「分句里没有任何信号」时的兜底判定，见 _section_at。
+# 不含裸的「加分」——正文里「加分」是分句级信号，当标题用会误伤一大片。
+SECTION_BONUS_WORDS = ("加分项", "加分条件", "优先条件", "以下为加分", "加分技能", "nice to have")
+SECTION_REQUIRED_WORDS = ("任职要求", "岗位要求", "任职资格", "必备要求", "硬性要求", "技能要求")
+
 # 目标等级推定：动词强度 → 0–5 级中的目标档位
 LEVEL_RULES: tuple[tuple[int, tuple[str, ...]], ...] = (
     (4, ("精通", "深入理解", "底层原理", "源码", "架构", "专家")),
@@ -90,18 +95,47 @@ def _clause_at(text: str, position: int) -> str:
     return text[start:end].strip()
 
 
-def _classify(clause: str) -> Literal["required", "bonus"]:
-    """先看加分信号再看必备信号。
+def _classify(clause: str, section: bool | None = None) -> Literal["required", "bonus"]:
+    """先看加分信号再看必备信号，都没有才回落到段落标题。
 
     有些 JD 写「必备技能：Java；加分项：Redis」，两类词会同时出现在一个分句里，
     这时「优先/加分」更具体，优先采信。
+
+    section 是所在段落的判定（True=加分段 / False=必备段 / None=没有标题）。
+    它只在分句自身没有任何信号时才起作用：真实 JD 常把加分条目写成
+    「具备客户端（native）开发经验」这种不带「优先」二字的整句，标题是唯一的线索。
     """
     lowered = clause.lower()
     if any(word in lowered for word in BONUS_WORDS):
         return "bonus"
     if any(word in lowered for word in REQUIRED_WORDS):
         return "required"
+    if section is True:
+        return "bonus"
     return "required"
+
+
+def _section_at(text: str, position: int) -> bool | None:
+    """position 落在「加分项」段还是「必备要求」段。
+
+    取**位置之前最近**的那个标题，而不是「全文里出现过加分项」：JD 里两段并存是常态，
+    出现即判 bonus 会把整篇都算成加分，比不判更糟。
+    """
+    best_position = -1
+    best_flag: bool | None = None
+    for word in SECTION_BONUS_WORDS:
+        index = text.rfind(word, 0, position)
+        if index > best_position:
+            best_position, best_flag = index, True
+    for word in SECTION_REQUIRED_WORDS:
+        index = text.rfind(word, 0, position)
+        if index > best_position:
+            best_position, best_flag = index, False
+    return best_flag
+
+
+def _type_of(text: str, start: int, clause: str) -> Literal["required", "bonus"]:
+    return _classify(clause, _section_at(text, start))
 
 
 def _target_level(clause: str, req_type: str) -> int:
@@ -140,8 +174,9 @@ def parse_jd(text: str, dictionary: Dictionary) -> tuple[list[RequirementSuggest
         if current is None:
             merged[hit.skill_id] = _Draft(hit.skill_id, hit.alias, hit.start, hit.end, clause)
             continue
-        keep_required = _classify(current.clause) == "required" or _classify(clause) == "required"
-        if keep_required and _classify(current.clause) != "required":
+        keep_required = _type_of(text, current.start, current.clause) == "required" or _type_of(
+            text, hit.start, clause) == "required"
+        if keep_required and _type_of(text, current.start, current.clause) != "required":
             merged[hit.skill_id] = _Draft(hit.skill_id, hit.alias, hit.start, hit.end, clause)
 
     suggestions: list[RequirementSuggestion] = []
@@ -149,7 +184,7 @@ def parse_jd(text: str, dictionary: Dictionary) -> tuple[list[RequirementSuggest
         skill = dictionary.get(draft.skill_id)
         if skill is None:  # 理论上不会发生：hits 来自同一份词典
             continue
-        req_type = _classify(draft.clause)
+        req_type = _type_of(text, draft.start, draft.clause)
         left = max(0, draft.start - EVIDENCE_RADIUS)
         right = min(len(text), draft.end + EVIDENCE_RADIUS)
         suggestions.append(

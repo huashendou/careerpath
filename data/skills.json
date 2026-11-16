@@ -366,9 +366,11 @@
         "element plus",
         "antd",
         "ant design",
-        "组件库"
+        "ui 组件库",
+        "组件库开发",
+        "组件库建设"
       ],
-      "note": "Sass/Less 变量与嵌套、Tailwind 原子化、UI 库的二次封装与主题定制。"
+      "note": "Sass/Less 变量与嵌套、Tailwind 原子化、UI 库的二次封装与主题定制。别名不写裸的「组件库」：真实 JD 的「高知名度博客、开源项目、开源组件库等经验」是加分项，不是要求你会二次封装 UI 库，裸词会把它误抽成必备要求。"
     },
     {
       "id": "frontend-build",
