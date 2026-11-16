@@ -1,0 +1,11 @@
+# 本地数据脚本依赖（scripts/init_db.py 建库建表要连 MySQL）。
+#
+# 为什么单独放这里，不并进 analysis-service/requirements.txt：
+# 分析服务 v3 起不连数据库、不做鉴权，它确实不需要 PyMySQL。
+# 需要连库的是 scripts/ 下的运维脚本，把两者混在一起会让依赖关系失真。
+#
+# 安装（和主依赖一起）：
+#   Windows      analysis-service\.venv\Scripts\pip install -r analysis-service/requirements.txt -r scripts/requirements.txt
+#   macOS/Linux  analysis-service/.venv/bin/pip install -r analysis-service/requirements.txt -r scripts/requirements.txt
+
+pymysql>=1.1

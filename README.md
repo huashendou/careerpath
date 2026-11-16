@@ -56,39 +56,131 @@
 
 ## 快速开始
 
-### 1. 准备环境
+### 环境要求
 
-- JDK 25、Maven 3.9+、Node.js 18+、Python 3.11+、MySQL 8
+| 依赖 | 版本 | 为什么是这个版本 |
+|---|---|---|
+| JDK | **25** | `pom.xml` 里 `java.version=25`，低版本编译不过 |
+| Maven | 3.9+ | 仓库**没有** `mvnw`，必须自己装 |
+| Node.js | 18+ | 构建前端 |
+| Python | 3.12+ | 分析服务 |
+| MySQL | **8.0+** | 排序规则用 `utf8mb4_0900_ai_ci`，5.7 不支持 |
 
-### 2. 配置环境变量
+> **Windows 用户**：需要 **Git Bash**。`scripts/dev-up.sh` 是 bash 脚本，在 cmd 或 PowerShell 里跑不了。
+
+### 1. 克隆并配置 `.env`
 
 ```bash
+git clone https://github.com/huashendou/careerpath.git
+cd careerpath
 cp .env.example .env
 ```
 
-填入数据库口令、`JWT_SECRET`、`INTERNAL_TOKEN`（后两者 Java 与分析服务必须一致）。
+编辑 `.env`，三项必填：
 
-### 3. 初始化数据库
+| 变量 | 填什么 |
+|---|---|
+| `DB_PASSWORD` | MySQL 账号的口令 |
+| `JWT_SECRET` | 32 字节以上随机串，Java 用它签 JWT |
+| `INTERNAL_TOKEN` | Java 与分析服务共用的内部密钥，**两边必须是同一个值** |
 
-```bash
-python scripts/init_db.py    # 建库建表（17 张）
-python scripts/seed_demo.py  # 灌入种子与演示数据
-```
-
-### 4. 一键启动三进程
-
-```bash
-bash scripts/dev-up.sh    # 启动 Java / 分析服务 / 前端
-bash scripts/dev-down.sh  # 停止并清理端口
-```
-
-启动后访问 http://localhost:5173
-
-### 5. 端到端冒烟
+生成两个随机串（执行两次，各填一个）：
 
 ```bash
-python scripts/smoke_e2e.py
+python -c "import secrets;print(secrets.token_urlsafe(48))"
 ```
+
+`DB_USERNAME` 默认 `careerpath`。不想新建 MySQL 账号也可以改成 `root`，但该账号必须对 `career_path` 库有建库建表权限——`docs/schema.sql` 第一条语句就是 `CREATE DATABASE`。
+
+建专用账号（推荐）：
+
+```sql
+CREATE USER 'careerpath'@'localhost' IDENTIFIED BY '你的口令';
+GRANT ALL PRIVILEGES ON career_path.* TO 'careerpath'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+`ALL ON career_path.*` 已包含该库的 `CREATE` 权限，够 `schema.sql` 建库用。
+
+### 2. 装 Python 依赖
+
+```bash
+# Windows
+python -m venv analysis-service/.venv
+analysis-service/.venv/Scripts/pip install -r analysis-service/requirements.txt -r scripts/requirements.txt
+
+# macOS / Linux
+python3 -m venv analysis-service/.venv
+analysis-service/.venv/bin/pip install -r analysis-service/requirements.txt -r scripts/requirements.txt
+```
+
+两个文件都要装。`scripts/requirements.txt` 里单独放 `PyMySQL`——只有建库脚本需要连 MySQL，分析服务本身不连库。
+
+### 3. 装前端依赖
+
+```bash
+cd frontend && npm install && cd ..
+```
+
+`node_modules` 不进仓库，跳过这步 `npm run dev` 会直接失败。
+
+### 4. 建库建表
+
+这一步只要 MySQL 起着，不需要启动服务。
+
+```bash
+# Windows
+analysis-service/.venv/Scripts/python.exe scripts/init_db.py
+
+# macOS / Linux
+analysis-service/.venv/bin/python scripts/init_db.py
+```
+
+脚本可重复执行（DDL 全带 `IF NOT EXISTS`）。
+
+### 5. 启动三进程
+
+```bash
+bash scripts/dev-up.sh
+```
+
+首次启动会自动 `mvn package`，耐心等一两分钟。启动后打开 http://localhost:5173 。
+
+停止：`bash scripts/dev-down.sh`（会清掉 pid 和端口占用）。
+
+### 6. 灌演示数据
+
+⚠️ **必须在第 5 步之后跑**——`seed_demo.py` 是通过 HTTP 调接口写数据的，服务没起就会连不上。
+
+```bash
+# Windows
+analysis-service/.venv/Scripts/python.exe scripts/seed_demo.py
+
+# macOS / Linux
+analysis-service/.venv/bin/python scripts/seed_demo.py
+```
+
+默认演示账号：**`demo_student` / `Demo!2026`**，含 2 个真实岗位与完整技能档案。
+
+### 7. 端到端冒烟（可选）
+
+```bash
+analysis-service/.venv/Scripts/python.exe scripts/smoke_e2e.py
+```
+
+### 常见问题
+
+| 现象 | 原因与处理 |
+|---|---|
+| `PATH 上找不到 java` / `node` | 装完要**重开终端**，PATH 才生效 |
+| `找不到 mvn` | 装在非默认位置就传环境变量：`MVN=/你的/mvn bash scripts/dev-up.sh` |
+| `ModuleNotFoundError: pymysql` | 漏装第 2 步的 `scripts/requirements.txt` |
+| Java 起不来 | 看 `.logs/java.log`，多数是 `.env` 没填或 MySQL 没启动 |
+| 端口被占 | 先 `bash scripts/dev-down.sh` 清理；Windows 上 `npm run dev` 可能留 node 子进程，需按端口再杀一次 |
+
+### 关于 Docker
+
+仓库暂未提供 `docker-compose.yml`。如果你希望朋友一条命令跑起来而不装 JDK/Maven/MySQL，可以提 issue——这是下一步计划做的事。
 
 ## 功能范围
 
