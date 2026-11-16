@@ -229,6 +229,11 @@ function goMatch(row) {
   router.push({ name: 'match', params: { jobId: row.id } })
 }
 
+/** 有技能要求才谈得上匹配：必备和加分都为空时，匹配接口只会回一句「没有要求」。 */
+function hasRequirement(row) {
+  return (row.requiredCount || 0) + (row.bonusCount || 0) > 0
+}
+
 function statusTag(status) {
   const map = {
     pending: { text: '待解析', type: 'info' },
@@ -283,10 +288,23 @@ onMounted(() => {
       <el-table-column label="录入时间" width="110">
         <template #default="{ row }">{{ (row.createdAt || '').slice(0, 10) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="238" fixed="right">
+      <el-table-column label="操作" width="252" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openRequirements(row)">技能要求</el-button>
-          <el-button link type="primary" @click="goMatch(row)">去匹配</el-button>
+          <!-- 匹配是本项目的主线动作，所以给实心按钮而不是第四个链接。
+               没有技能要求时禁掉：点进去只会得到「该岗位没有技能要求」的报错，
+               与其让人撞一次错再回来，不如在这里就说明白。 -->
+          <el-tooltip
+            :disabled="hasRequirement(row)"
+            content="先解析 JD 或手工加技能要求，否则算不出匹配"
+            placement="top"
+          >
+            <span class="match-wrap">
+              <el-button size="small" type="primary" :disabled="!hasRequirement(row)" @click="goMatch(row)">
+                去匹配
+              </el-button>
+            </span>
+          </el-tooltip>
           <el-button link @click="openEdit(row)">编辑</el-button>
           <el-button link type="danger" @click="remove(row)">删除</el-button>
         </template>
@@ -460,5 +478,13 @@ onMounted(() => {
 
 .foot-left {
   float: left;
+}
+
+/* 实心按钮和三个链接混排时对齐基线，否则行内高低不齐 */
+.match-wrap {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 8px;
+  vertical-align: middle;
 }
 </style>

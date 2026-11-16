@@ -14,19 +14,74 @@ const data = ref(null)
 const insights = ref(null)
 const failed = ref(false)
 
-/** 四张统计卡。数字全部来自 /api/stats/overview，没有一条是写死的示例值。 */
+/**
+ * 主线四步。每一步的「完成与否」都取自 /api/stats/overview 的真实统计，
+ * 不靠前端记忆「用户点没点过按钮」——刷新一次就失忆的进度条比没有更糟。
+ *
+ * 第 3 步判 parsedJobCount 而不是 jobCount：录了岗位但没解析，匹配根本跑不出来。
+ * 若这里报「已完成」，用户会带着「都做完了」的预期走到第四步撞上「该岗位没有技能要求」，
+ * 错在进度条说了假话。所以显示「N 个岗位，M 个已解析」，把差的那一步露出来。
+ */
+const steps = computed(() => {
+  const d = data.value
+  if (!d) return []
+  const last = d.lastMatch
+  return [
+    {
+      key: 'profile',
+      no: 1,
+      title: '补齐基本档案',
+      done: d.profileCompleted,
+      hint: d.profileCompleted ? '学校专业已记录' : '学校、专业任缺一项',
+      action: d.profileCompleted ? '查看' : '去填写',
+      to: '/profile?tab=basic',
+    },
+    {
+      key: 'self',
+      no: 2,
+      title: '给技能自评',
+      done: d.selfRatedCount > 0,
+      hint: d.selfRatedCount > 0 ? `已自评 ${d.selfRatedCount} 项` : '一项都还没打分',
+      action: d.selfRatedCount > 0 ? '继续补' : '去自评',
+      to: '/profile?tab=skills',
+    },
+    {
+      key: 'job',
+      no: 3,
+      title: '录入并解析岗位',
+      done: d.parsedJobCount > 0,
+      hint: d.jobCount === 0
+        ? '还没录入岗位'
+        : `${d.jobCount} 个岗位，${d.parsedJobCount} 个已解析`,
+      action: d.parsedJobCount > 0 ? '管理' : '去解析',
+      to: '/jobs',
+    },
+    {
+      key: 'match',
+      no: 4,
+      title: '看差距在哪',
+      done: Boolean(last),
+      hint: last ? `上次：${last.jobTitle}` : '还没做过匹配',
+      action: last ? '看报告' : '去匹配',
+      to: last ? `/match/${last.jobPositionId}` : '/jobs',
+    },
+  ]
+})
+
+/** 当前步 = 第一个没完成的。全部完成时为 null，页面切成「已走通」的收尾提示。 */
+const currentStep = computed(() => steps.value.find((step) => !step.done) || null)
+
+/** 辅助数字：只留主线相关的三个。投递/面试是二期，数据看板里有它们的切法，不占首屏。 */
 const cards = computed(() => {
   const d = data.value
   if (!d) return []
-  const appTotal = (insights.value?.applicationStatus || []).reduce((sum, item) => sum + item.count, 0)
-  const interviewTotal = (insights.value?.interviewResult || []).reduce((sum, item) => sum + item.count, 0)
   return [
     {
       key: 'jobs',
       label: '目标岗位',
       value: d.jobCount,
       unit: '个',
-      hint: d.jobCount === 0 ? '还没有录入岗位' : '已录入并可解析',
+      hint: d.parsedJobCount === 0 ? '都还没解析' : `${d.parsedJobCount} 个已解析`,
       to: '/jobs',
     },
     {
@@ -42,32 +97,8 @@ const cards = computed(() => {
       label: '缺证据的技能',
       value: d.evidenceMissingCount,
       unit: '项',
-      hint: d.evidenceMissingCount === 0 ? '都挂上材料了' : '会但拿不出材料',
-      to: '/profile',
-    },
-    {
-      key: 'profile',
-      label: '个人档案',
-      value: d.profileCompleted ? '已完善' : '未填写',
-      unit: '',
-      hint: d.profileCompleted ? '学校专业已记录' : '补齐后匹配更准',
-      to: '/profile',
-    },
-    {
-      key: 'applications',
-      label: '投递清单',
-      value: appTotal,
-      unit: '条',
-      hint: appTotal === 0 ? '还没开始投' : '含待投与已结束',
-      to: '/applications',
-    },
-    {
-      key: 'interviews',
-      label: '面试复盘',
-      value: interviewTotal,
-      unit: '场',
-      hint: interviewTotal === 0 ? '面试后记得复盘' : '已记录的场次',
-      to: '/interviews',
+      hint: d.evidenceMissingCount === 0 ? '都挂上材料了' : '会做但拿不出材料',
+      to: '/profile?tab=evidence',
     },
   ]
 })
@@ -113,13 +144,86 @@ onMounted(load)
 <template>
   <div class="page">
     <header class="greet">
-      <h1>{{ auth.displayName ? `${auth.displayName}，` : '' }}今天先做哪一步？</h1>
-      <p class="sub">录一个目标岗位 → 解析技能要求 → 对照自己的能力 → 看差在哪 → 生成学习任务。</p>
+      <h1>{{ auth.displayName ? `${auth.displayName}，` : '' }}{{ currentStep ? `第 ${currentStep.no} 步：${currentStep.title}` : '主线四步都走通了' }}</h1>
+      <p class="sub">
+        <template v-if="currentStep">跟着下面的第 {{ currentStep.no }} 步走，其余步骤灰着不用管。</template>
+        <template v-else>继续补证据、生成学习任务，或者到「岗位」页换一个岗位再比一次。</template>
+      </p>
     </header>
 
-    <ServiceHealthCard />
+    <!-- 主线四步：概览页的第一屏只回答「下一步做什么」，不铺数字 -->
+    <section v-if="data" class="flow">
+      <ol class="steps">
+        <li
+          v-for="step in steps"
+          :key="step.key"
+          class="step"
+          :class="{ done: step.done, current: currentStep && currentStep.key === step.key }"
+        >
+          <button type="button" class="step-btn" @click="router.push(step.to)">
+            <span class="step-no">{{ step.done ? '✓' : step.no }}</span>
+            <span class="step-body">
+              <span class="step-title">{{ step.title }}</span>
+              <span class="step-hint">{{ step.hint }}</span>
+            </span>
+            <span class="step-action">{{ step.action }} ›</span>
+          </button>
+        </li>
+      </ol>
 
-    <!-- 统计卡：有数据看数字，没数据看引导语；两种状态都不虚构数字 -->
+      <!-- 四步全绿时没有「当前步」可高亮，页面会失去落点。给一条收尾指引，别让首屏空转 -->
+      <p v-if="!currentStep" class="flow-done">
+        四步都走通了。接下来可以
+        <el-link type="primary" :underline="false" @click="router.push('/profile?tab=evidence')">给技能挂上证据</el-link>
+        或
+        <el-link type="primary" :underline="false" @click="router.push('/jobs')">换一个岗位再比一次</el-link>
+        。
+      </p>
+    </section>
+
+    <el-skeleton v-else-if="loading" :rows="2" animated />
+
+    <el-card v-else shadow="never">
+      <p class="muted">概览数据加载失败。<el-link type="primary" :underline="false" @click="load">重试</el-link></p>
+    </el-card>
+
+    <!-- 最近一次匹配：结论直接摊开，不用回岗位列表里找 -->
+    <section class="block">
+      <div class="block-head">
+        <h2>最近一次匹配</h2>
+        <el-link v-if="lastMatch" type="primary" :underline="false" @click="router.push('/jobs')">
+          换一个岗位
+        </el-link>
+      </div>
+
+      <div v-if="lastMatch" class="match">
+        <div class="match-top">
+          <div class="match-title">{{ lastMatch.jobTitle }}</div>
+          <el-button type="primary" size="small" @click="router.push(`/match/${lastMatch.jobPositionId}`)">
+            看完整差距
+          </el-button>
+        </div>
+        <div class="match-scores">
+          <div class="score">
+            <span class="score-label">必备匹配</span>
+            <span class="score-value">{{ scoreText(lastMatch.requiredScore) }}</span>
+          </div>
+          <div class="score">
+            <span class="score-label">加分匹配</span>
+            <span class="score-value">{{ scoreText(lastMatch.bonusScore) }}</span>
+          </div>
+        </div>
+        <p class="muted small">
+          必备与加分分开计算，不合成总分；证据不参与算分。打开报告会按你当前的自评重算一次。
+        </p>
+      </div>
+
+      <el-empty v-else-if="!loading" :description="currentStep ? '还没有匹配记录，先完成前面几步' : '还没有匹配记录'">
+        <el-button type="primary" @click="router.push('/jobs')">录入第一个岗位</el-button>
+      </el-empty>
+    </section>
+
+    <!-- 辅助数字：只放和主线相关的三个，点进去都落在对应位置 -->
     <div v-if="data" class="cards">
       <article
         v-for="card in cards"
@@ -138,100 +242,79 @@ onMounted(load)
       </article>
     </div>
 
-    <el-skeleton v-else-if="loading" :rows="2" animated />
+    <!-- 数据看板（二期模块 9）：默认收起，它讲的是「已经攒下的数据」，不该抢主线的地方 -->
+    <el-collapse v-if="insights" class="board-collapse">
+      <el-collapse-item name="board">
+        <template #title>
+          <span class="board-tab">数据看板</span>
+          <el-tag size="small" type="info" effect="plain">二期</el-tag>
+        </template>
 
-    <el-card v-else shadow="never">
-      <p class="muted">概览数据加载失败。<el-link type="primary" :underline="false" @click="load">重试</el-link></p>
-    </el-card>
-
-    <!-- 最近匹配 -->
-    <section class="block">
-      <div class="block-head">
-        <h2>最近一次匹配</h2>
-        <el-link v-if="lastMatch" type="primary" :underline="false" @click="router.push('/jobs')">
-          查看全部岗位
-        </el-link>
-      </div>
-
-      <div v-if="lastMatch" class="match">
-        <div class="match-title">{{ lastMatch.jobTitle }}</div>
-        <div class="match-scores">
-          <div class="score">
-            <span class="score-label">必备匹配</span>
-            <span class="score-value">{{ scoreText(lastMatch.requiredScore) }}</span>
-          </div>
-          <div class="score">
-            <span class="score-label">加分匹配</span>
-            <span class="score-value">{{ scoreText(lastMatch.bonusScore) }}</span>
-          </div>
-        </div>
-        <p class="muted small">必备与加分分开计算，不合成总分；证据不参与算分。</p>
-      </div>
-
-      <el-empty v-else-if="!loading" description="还没有匹配记录">
-        <el-button type="primary" @click="router.push('/jobs')">录入第一个岗位</el-button>
-      </el-empty>
-    </section>
-
-    <!-- 数据看板（二期模块 9）：不单开页面，趋势与分布直接进概览 -->
-    <section v-if="insights" class="block">
-      <div class="block-head">
-        <h2>数据看板</h2>
-        <span class="cp-muted small">只做已有数据的另一种切法，不额外埋点</span>
-      </div>
-
-      <div class="board">
-        <div class="board-col">
-          <h3 class="board-title">最近匹配分数</h3>
-          <div v-if="insights.matchTrend.length" class="trend">
-            <div v-for="(point, index) in insights.matchTrend" :key="index" class="trend-row">
-              <span class="trend-date cp-num">{{ (point.at || '').slice(5, 10) }}</span>
-              <div class="bar">
-                <div class="bar-fill" :style="{ width: `${barWidth(point.requiredScore)}%` }" />
-                <span v-if="point.requiredScore == null" class="bar-empty">无法算分</span>
+        <div class="board">
+          <div class="board-col">
+            <h3 class="board-title">最近匹配分数</h3>
+            <div v-if="insights.matchTrend.length" class="trend">
+              <div v-for="(point, index) in insights.matchTrend" :key="index" class="trend-row">
+                <span class="trend-date cp-num">{{ (point.at || '').slice(5, 10) }}</span>
+                <div class="bar">
+                  <div class="bar-fill" :style="{ width: `${barWidth(point.requiredScore)}%` }" />
+                  <span v-if="point.requiredScore == null" class="bar-empty">无法算分</span>
+                </div>
+                <span class="trend-score cp-num">{{ point.requiredScore == null ? '—' : Number(point.requiredScore).toFixed(1) }}</span>
               </div>
-              <span class="trend-score cp-num">{{ point.requiredScore == null ? '—' : Number(point.requiredScore).toFixed(1) }}</span>
             </div>
+            <p v-else class="cp-muted small">还没有匹配记录</p>
           </div>
-          <p v-else class="cp-muted small">还没有匹配记录</p>
-        </div>
 
-        <div class="board-col">
-          <h3 class="board-title">反复出现的差距</h3>
-          <div v-if="insights.topGaps.length" class="gaps">
-            <div v-for="gap in insights.topGaps" :key="gap.skillId" class="gap">
-              <span class="gap-name">{{ gap.skillName }}</span>
-              <el-tag size="small" type="warning" effect="plain">{{ gap.count }} 个岗位</el-tag>
+          <div class="board-col">
+            <h3 class="board-title">反复出现的差距</h3>
+            <div v-if="insights.topGaps.length" class="gaps">
+              <div v-for="gap in insights.topGaps" :key="gap.skillId" class="gap">
+                <span class="gap-name">{{ gap.skillName }}</span>
+                <el-tag size="small" type="warning" effect="plain">{{ gap.count }} 个岗位</el-tag>
+              </div>
             </div>
+            <p v-else class="cp-muted small">没有重复出现的差距</p>
           </div>
-          <p v-else class="cp-muted small">没有重复出现的差距</p>
-        </div>
 
-        <div class="board-col">
-          <h3 class="board-title">投递与面试</h3>
-          <div class="chips">
-            <el-tag v-for="item in insights.applicationStatus" :key="item.status" size="small" effect="plain">
-              {{ statusText[item.status] || item.status }} {{ item.count }}
-            </el-tag>
-            <span v-if="!insights.applicationStatus.length" class="cp-muted small">投递清单为空</span>
+          <div class="board-col">
+            <h3 class="board-title">投递与面试</h3>
+            <div class="chips">
+              <el-tag v-for="item in insights.applicationStatus" :key="item.status" size="small" effect="plain">
+                {{ statusText[item.status] || item.status }} {{ item.count }}
+              </el-tag>
+              <span v-if="!insights.applicationStatus.length" class="cp-muted small">投递清单为空</span>
+            </div>
+            <div class="chips">
+              <el-tag v-for="item in insights.interviewResult" :key="item.result" size="small" type="info" effect="plain">
+                {{ resultText[item.result] || item.result }} {{ item.count }}
+              </el-tag>
+              <span v-if="!insights.interviewResult.length" class="cp-muted small">还没有面试记录</span>
+            </div>
+            <p class="small cp-muted">
+              学习任务完成率：
+              <template v-if="insights.taskCompletion.rate == null">暂无任务</template>
+              <template v-else>
+                <b class="cp-num">{{ insights.taskCompletion.rate }}%</b>
+                （{{ insights.taskCompletion.done }} / {{ insights.taskCompletion.total }}）
+              </template>
+            </p>
           </div>
-          <div class="chips">
-            <el-tag v-for="item in insights.interviewResult" :key="item.result" size="small" type="info" effect="plain">
-              {{ resultText[item.result] || item.result }} {{ item.count }}
-            </el-tag>
-            <span v-if="!insights.interviewResult.length" class="cp-muted small">还没有面试记录</span>
-          </div>
-          <p class="small cp-muted">
-            学习任务完成率：
-            <template v-if="insights.taskCompletion.rate == null">暂无任务</template>
-            <template v-else>
-              <b class="cp-num">{{ insights.taskCompletion.rate }}%</b>
-              （{{ insights.taskCompletion.done }} / {{ insights.taskCompletion.total }}）
-            </template>
-          </p>
         </div>
-      </div>
-    </section>
+      </el-collapse-item>
+    </el-collapse>
+
+    <!-- 服务自检是开发排障用的，不该和业务内容平铺在第一屏。
+         它独立成一个折叠项、不挂在 insights 的 v-if 下：接口挂了的时候，恰恰最需要看它。 -->
+    <el-collapse class="board-collapse">
+      <el-collapse-item name="health">
+        <template #title>
+          <span class="board-tab">服务自检</span>
+          <el-tag size="small" effect="plain">开发</el-tag>
+        </template>
+        <ServiceHealthCard />
+      </el-collapse-item>
+    </el-collapse>
 
     <p class="disclaimer">
       技能权重与目标等级为示例数据，依据公开招聘信息的常见要求归纳，不是任何企业官方标准。
@@ -257,6 +340,201 @@ onMounted(load)
   font-size: 13px;
   color: var(--cp-text-3);
 }
+
+/* ---------------------------------------------------------------- 主线四步 */
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 13px;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--cp-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.step-btn:hover,
+.step-btn:focus-visible {
+  border-color: var(--cp-primary);
+  outline: none;
+}
+
+.step-no {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #eef0f6;
+  color: var(--cp-text-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.step-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cp-text-2);
+}
+
+.step-hint {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--cp-text-3);
+}
+
+.step-action {
+  margin-left: auto;
+  flex: none;
+  font-size: 11px;
+  color: var(--cp-text-3);
+}
+
+/* 已完成：勾 + 弱化，让它退到背景里，眼睛自然落在没完成的那步 */
+.step.done .step-btn {
+  background: #fbfbfd;
+}
+
+.step.done .step-no {
+  background: var(--cp-primary-weak);
+  color: var(--cp-primary);
+}
+
+.step.done .step-title {
+  color: var(--cp-text-3);
+}
+
+/* 当前步：唯一一处强调色，页面上「现在该干什么」只有这一个答案 */
+.step.current .step-btn {
+  border-color: var(--cp-primary);
+  box-shadow: 0 6px 18px -14px rgba(79, 70, 229, 0.85);
+}
+
+.step.current .step-no {
+  background: var(--cp-primary);
+  color: #fff;
+}
+
+.step.current .step-title {
+  color: var(--cp-text);
+}
+
+.step.current .step-action {
+  color: var(--cp-primary);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.flow-done {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--cp-text-3);
+}
+
+@media (max-width: 560px) {
+  .steps {
+    grid-template-columns: 1fr;
+  }
+  .step-action {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------- 匹配结论 */
+
+.block {
+  padding: 16px 18px;
+  background: #fff;
+  border: 1px solid var(--cp-border);
+  border-radius: 10px;
+}
+
+.block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.block-head h2 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.match-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.match-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.match-scores {
+  display: flex;
+  gap: 32px;
+  margin: 12px 0 10px;
+}
+
+.score {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.score-label {
+  font-size: 12px;
+  color: var(--cp-text-3);
+}
+
+.score-value {
+  font-size: 20px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--cp-primary);
+}
+
+.muted {
+  color: var(--cp-text-3);
+  font-size: 13px;
+}
+
+.small {
+  font-size: 11.5px;
+}
+
+/* ---------------------------------------------------------------- 辅助数字 */
 
 .cards {
   display: grid;
@@ -305,73 +583,25 @@ onMounted(load)
   color: var(--cp-text-3);
 }
 
-.block {
-  padding: 16px 18px;
-  background: #fff;
-  border: 1px solid var(--cp-border);
-  border-radius: 10px;
+/* ---------------------------------------------------------------- 数据看板 */
+
+.board-collapse {
+  border-top: 1px solid var(--cp-border);
+  border-bottom: none;
 }
 
-.block-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.block-head h2 {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.match-title {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.match-scores {
-  display: flex;
-  gap: 32px;
-  margin: 12px 0 10px;
-}
-
-.score {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.score-label {
-  font-size: 12px;
-  color: var(--cp-text-3);
-}
-
-.score-value {
-  font-size: 20px;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
-  color: var(--cp-primary);
-}
-
-.muted {
-  color: var(--cp-text-3);
+.board-tab {
+  margin-right: 8px;
   font-size: 13px;
-}
-
-.small {
-  font-size: 11.5px;
-}
-
-.disclaimer {
-  font-size: 11.5px;
-  line-height: 1.6;
-  color: var(--cp-text-3);
+  font-weight: 600;
+  color: var(--cp-text-2);
 }
 
 .board {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 18px;
+  padding: 4px 0 8px;
 }
 
 .board-title {
@@ -455,5 +685,11 @@ onMounted(load)
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 6px;
+}
+
+.disclaimer {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--cp-text-3);
 }
 </style>

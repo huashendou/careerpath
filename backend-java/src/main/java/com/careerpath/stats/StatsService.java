@@ -52,6 +52,17 @@ public class StatsService {
         int taskOpenCount = count(
                 "SELECT COUNT(*) FROM learning_task WHERE user_id = ? AND status IN ('todo','doing')", userId);
 
+        // 自评过 = level > 0。落库的 0 分记录不算：他明确表示「没接触」，不能算作完成自评一步。
+        int selfRatedCount = count("SELECT COUNT(*) FROM user_skill WHERE user_id = ? AND level > 0", userId);
+
+        // 已解析 = 该岗位真有技能要求行。录入岗位不等于能匹配，这两件事在概览里必须分开说。
+        int parsedJobCount = count("""
+                SELECT COUNT(DISTINCT r.job_position_id)
+                  FROM job_skill_requirement r
+                  JOIN job_position j ON j.id = r.job_position_id
+                 WHERE j.user_id = ?
+                """, userId);
+
         // 已自评但没有任何证据关联的技能数——「会但拿不出材料」，这是要显式提醒的一类缺口
         int evidenceMissingCount = count("""
                 SELECT COUNT(*) FROM user_skill us
@@ -65,7 +76,9 @@ public class StatsService {
 
         return new OverviewResponse(
                 profileCompleted,
+                selfRatedCount,
                 jobCount,
+                parsedJobCount,
                 taskOpenCount,
                 evidenceMissingCount,
                 lastMatch(userId),

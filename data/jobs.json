@@ -1,6 +1,6 @@
 {
   "meta": {
-    "name": "职能雷达 · 岗位技能模型",
+    "name": "职航 CareerPath · 岗位技能模型",
     "version": "v0.1",
     "revision": "r2",
     "revisionNote": "r2（2026-11-15）：计分口径改为 core-only —— 基础匹配度只使用 core，plus 完全退出分子分母并独立展示。技能项、岗位、权重数值与 targets 一律未改动；meta.version 仍为 v0.1，因为「示例数据 v0.1」指数据本身。",
