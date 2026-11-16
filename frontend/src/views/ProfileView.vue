@@ -1,19 +1,31 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/client'
 import SkillSelfPanel from '../components/profile/SkillSelfPanel.vue'
 import EvidencePanel from '../components/profile/EvidencePanel.vue'
 import ProjectPanel from '../components/profile/ProjectPanel.vue'
+import SkillCatalogPanel from '../components/profile/SkillCatalogPanel.vue'
 
 /**
- * 技能画像（模块 1 的档案 + 模块 5 的全部内容）。
+ * 我的能力（模块 1 的档案 + 模块 4 的词典 + 模块 5 的自评/证据/项目）。
  *
- * 四个 tab 对应四件互相正交的事：我是谁（档案）、我会什么（自评）、我拿得出什么（证据）、
- * 我做过什么（项目）。刻意不合并成一个长页面——它们更新频率不同，混在一起会让人
- * 觉得「每次都得从头填一遍」。
+ * 五个 tab 对应四件互相正交的事：我会什么（自评）、我拿得出什么（证据）、我做过什么（项目）、
+ * 我是谁（档案）、这个方向由哪些能力构成（词典）。
+ *
+ * 顺序是刻意的：自评排第一，因为它是匹配的前置；档案排到后面，因为「不想填学校」不该挡住
+ * 一个只想看匹配度的人。原先是「技能画像」页 + 独立的「技能图谱」页两个导航项，
+ * 两个都叫「技能」反而让人不知道该点哪个，核心动作被埋进二级 tab。
  */
-const activeTab = ref('basic')
+const route = useRoute()
+
+const TABS = ['skills', 'evidence', 'projects', 'basic', 'catalog']
+const activeTab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'skills')
+
+watch(() => route.query.tab, (tab) => {
+  if (TABS.includes(tab)) activeTab.value = tab
+})
 
 const loading = ref(true)
 const saving = ref(false)
@@ -71,6 +83,17 @@ onMounted(load)
 <template>
   <div class="page">
     <el-tabs v-model="activeTab" class="tabs">
+      <el-tab-pane label="技能自评" name="skills">
+        <SkillSelfPanel />
+      </el-tab-pane>
+
+      <el-tab-pane label="证据链" name="evidence">
+        <EvidencePanel />
+      </el-tab-pane>
+
+      <el-tab-pane label="项目" name="projects">
+        <ProjectPanel />
+      </el-tab-pane>
       <el-tab-pane label="基本档案" name="basic">
         <section class="block">
           <div class="block-head">
@@ -115,16 +138,8 @@ onMounted(load)
         </section>
       </el-tab-pane>
 
-      <el-tab-pane label="技能自评" name="skills">
-        <SkillSelfPanel />
-      </el-tab-pane>
-
-      <el-tab-pane label="证据链" name="evidence">
-        <EvidencePanel />
-      </el-tab-pane>
-
-      <el-tab-pane label="项目" name="projects">
-        <ProjectPanel />
+      <el-tab-pane label="技能词典" name="catalog">
+        <SkillCatalogPanel />
       </el-tab-pane>
     </el-tabs>
   </div>

@@ -179,12 +179,13 @@ function removeRow(index) {
   rows.value.splice(index, 1)
 }
 
+/** 返回是否保存成功：给「保存并去匹配」用，失败时不能跳走。 */
 async function saveRequirements() {
   const items = []
   for (const row of rows.value) {
     if (!row.skillId) {
       ElMessage.warning('有未选择技能的行，请先选技能或删除该行')
-      return
+      return false
     }
     items.push({
       skillId: row.skillId, reqType: row.reqType,
@@ -201,11 +202,27 @@ async function saveRequirements() {
     }))
     ElMessage.success(`已保存 ${data.items.length} 项要求`)
     load()
+    return true
   } catch (error) {
     ElMessage.error(error.message || '保存失败')
+    return false
   } finally {
     reqSaving.value = false
   }
+}
+
+/**
+ * 保存要求后直接去匹配。
+ *
+ * 早先这里是一个「关掉并去匹配」的纯链接：点它只关弹窗、不保存，用户刚改的十几行
+ * 要求全丢，而匹配用的还是旧要求——看起来就是「系统算错了」。改成先保存再跳。
+ */
+async function saveAndMatch() {
+  if (!reqJob.value?.id) return
+  const saved = await saveRequirements()
+  if (!saved) return
+  reqVisible.value = false
+  goMatch(reqJob.value)
 }
 
 function goMatch(row) {
@@ -378,7 +395,9 @@ onMounted(() => {
 
       <template #footer>
         <span class="foot-left">
-          <el-button v-if="reqJob" link type="primary" @click="reqVisible = false; goMatch(reqJob)">关掉并去匹配</el-button>
+          <el-button v-if="reqJob" link type="primary" :disabled="reqSaving" @click="saveAndMatch">
+            保存并去匹配
+          </el-button>
         </span>
         <el-button @click="reqVisible = false">关闭</el-button>
         <el-button type="primary" :loading="reqSaving" @click="saveRequirements">保存要求</el-button>

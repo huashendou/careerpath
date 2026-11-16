@@ -3,8 +3,9 @@
 // （T7–T9，+2 表 +2 页 /applications、/interviews），一期**不得**为它们预留空页。
 // 模块 10 项目成果并入模块 5，作为证据来源，不单设页面。
 //
-// 页面清单：登录 / 概览 / 岗位解析 / 技能图谱 / 技能画像 / 岗位匹配 / 学习计划。
-// 岗位匹配是详情页（从岗位解析进入），因此侧边菜单只有 5 项。
+// 页面清单：登录 / 概览 / 岗位（含匹配）/ 我的能力 / 学习任务 / 投递清单 / 面试复盘。
+// 导航只露 3 个核心入口（概览、岗位、我的能力）+ 学习任务；投递与面试收进「更多」并标二期。
+// 「技能图谱」已并入「我的能力」的第四个 tab，/skills 保留为重定向，避免旧链接 404。
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import AppLayout from '../layouts/AppLayout.vue'
@@ -34,20 +35,16 @@ const routes = [
         path: 'jobs',
         name: 'jobs',
         component: () => import('../views/JobsView.vue'),
-        meta: { title: '岗位解析', phase: 'T3', icon: 'Document' },
+        meta: { title: '岗位与解析', phase: 'T3', icon: 'Document' },
       },
-      {
-        path: 'skills',
-        name: 'skills',
-        component: () => import('../views/SkillsView.vue'),
-        meta: { title: '技能图谱', phase: 'T3', icon: 'Share' },
-      },
+      // 旧「技能图谱」入口：并入能力页的词典 tab
+      { path: 'skills', redirect: { name: 'profile', query: { tab: 'catalog' } } },
       {
         path: 'profile',
         name: 'profile',
         component: () => import('../views/ProfileView.vue'),
-        // 档案（T1）+ 自评 / 证据 / 项目（T3–T4），页面内按 tab 分组
-        meta: { title: '技能画像', phase: 'T4', icon: 'User' },
+        // 自评 / 证据 / 项目 / 档案（T1–T4）+ 技能词典（T3），页面内按 tab 分组
+        meta: { title: '我的能力', phase: 'T4', icon: 'User' },
       },
       {
         path: 'match/:jobId',
@@ -59,7 +56,7 @@ const routes = [
         path: 'tasks',
         name: 'tasks',
         component: () => import('../views/TasksView.vue'),
-        meta: { title: '学习计划', phase: 'T5', icon: 'Notebook' },
+        meta: { title: '学习任务', phase: 'T5', icon: 'Notebook' },
       },
       // 二期：投递清单与面试复盘（各一页，不预留空页）
       {

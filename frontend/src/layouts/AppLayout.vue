@@ -7,13 +7,17 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
-// 菜单放 7 个一级页面；岗位匹配是从岗位解析进入的详情页（一期 7 页 + 二期 2 页 = 9 页）
+// 导航只放核心链路：概览 → 岗位 → 我的能力 → 学习任务。
+// 投递与面试是二期简化模块，收进「更多」并标二期——它们和核心平起平坐时，
+// 第一眼就分不清主线在哪（七个入口里有俩点开还是空页）。
 const menus = [
   { path: '/dashboard', label: '概览', icon: 'Odometer' },
-  { path: '/jobs', label: '岗位解析', icon: 'Document' },
-  { path: '/skills', label: '技能图谱', icon: 'Share' },
-  { path: '/profile', label: '技能画像', icon: 'User' },
-  { path: '/tasks', label: '学习计划', icon: 'Notebook' },
+  { path: '/jobs', label: '岗位', icon: 'Document' },
+  { path: '/profile', label: '我的能力', icon: 'User' },
+  { path: '/tasks', label: '学习任务', icon: 'Notebook' },
+]
+
+const laterMenus = [
   { path: '/applications', label: '投递清单', icon: 'Briefcase' },
   { path: '/interviews', label: '面试复盘', icon: 'ChatLineSquare' },
 ]
@@ -43,6 +47,18 @@ function signOut() {
           <el-icon><component :is="item.icon" /></el-icon>
           <span>{{ item.label }}</span>
         </el-menu-item>
+
+        <el-sub-menu index="more" popper-class="more-menu">
+          <template #title>
+            <el-icon><MoreFilled /></el-icon>
+            <span>更多</span>
+          </template>
+          <el-menu-item v-for="item in laterMenus" :key="item.path" :index="item.path">
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span>{{ item.label }}</span>
+            <el-tag class="later-tag" size="small" type="info" effect="plain">二期</el-tag>
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
 
       <div class="aside-foot">
@@ -138,6 +154,10 @@ function signOut() {
   flex: 1;
   border-right: none;
   padding: 8px;
+}
+
+.later-tag {
+  margin-left: 6px;
 }
 
 .menu :deep(.el-menu-item) {

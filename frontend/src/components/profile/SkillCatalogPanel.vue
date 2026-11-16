@@ -1,13 +1,16 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import http from '../api/client'
+import http from '../../api/client'
 
 /**
- * 技能图谱（模块 4）。
+ * 技能词典（模块 4）——「我的能力」页的第四个 tab。
  *
  * 只读视图：回答「这个方向由哪些能力构成、先学哪个再学哪个」。不掺个人数据，
- * 但会在卡片上标出「我的等级」，因为看不到自己的位置时，图谱就只是张目录。
+ * 但会在卡片上标出「我的等级」，因为看不到自己的位置时，词典就只是张目录。
+ *
+ * 原先是独立的「技能图谱」页，与「技能画像」并列在导航里；两个入口都叫「技能」，
+ * 用户分不清该点哪个，自评这类核心动作反而被埋进二级 tab。合并后这里只负责查阅。
  */
 const loading = ref(true)
 const categories = ref([])
