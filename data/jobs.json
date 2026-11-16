@@ -6,7 +6,7 @@
     "revisionNote": "r2（2026-11-15）：计分口径改为 core-only —— 基础匹配度只使用 core，plus 完全退出分子分母并独立展示。技能项、岗位、权重数值与 targets 一律未改动；meta.version 仍为 v0.1，因为「示例数据 v0.1」指数据本身。",
     "updatedAt": "2026-11-15",
     "displayBadge": "示例数据 v0.1",
-    "disclaimer": "示例数据 v0.1：本模型依据公开招聘信息的常见技能要求归纳整理，权重与目标等级为产品演示用的示例值，不是任何企业的官方标准，也不代表行业统一口径。后续须用真实招聘 JD 校准。",
+    "disclaimer": "示例数据 v0.1：技能项依据公开招聘 JD 归纳，并已用 2026-11 检索的 9 份真实 JD 做过方向性核对；权重与目标等级仍为演示用示例值，不是任何企业的官方标准，也不代表行业统一口径。正式校准需每岗位 ≥ 30 份样本。",
     "seniority": "本版统一面向「校招 / 实习（初级）」岗位，目标等级按应届生可达到的水平设定，不代表资深岗位要求。",
     "scoring": {
       "version": "v0.2-core-only",
@@ -84,8 +84,8 @@
       ]
     },
     "calibration": {
-      "status": "pending",
-      "currentSource": "公开招聘信息的常见技能要求归纳（示例）",
+      "status": "partial",
+      "currentSource": "2026-11 检索的 9 份公开招聘 JD（后端 / 前端 / 数据分析各 3 份）初步比对；样本量远低于正式校准要求，仅作方向性核对",
       "plannedSources": [
         "真实企业 JD 抽样（每岗位 ≥ 30 条）",
         "岗位技能词频统计",
@@ -96,6 +96,23 @@
         "sourceSample",
         "calibratedAt",
         "sampleSize"
+      ],
+      "samples": [
+        {"role": "java-backend", "company": "亚信科技（中国）有限公司", "title": "Java 开发实习生", "city": "厦门", "publishedAt": "2026-11-03", "url": "https://www.yingjiesheng.com/job-008-140-689.html"},
+        {"role": "java-backend", "company": "蔚来", "title": "后台开发实习生", "city": "合肥", "url": "https://www.shixiseng.com/intern/inn_ptw2aqlkfy5u"},
+        {"role": "java-backend", "company": "合肥人工智能与大数据研究院有限公司", "title": "后端实习生", "city": "合肥", "publishedAt": "2026-09-01", "url": "https://job.ustc.edu.cn/Internship/list.aspx?itemid=325145"},
+        {"role": "frontend", "company": "淘天集团", "title": "前端开发工程师（26 届实习）", "city": "杭州", "url": "https://www.zhipin.com/job_detail/db1a2dbfea2386dc03d639-0GVNV.html"},
+        {"role": "frontend", "company": "亚信科技（中国）有限公司", "title": "前端开发实习生-通信业务域", "city": "南京", "publishedAt": "2026-10-23", "url": "https://www.yingjiesheng.com/job-008-132-126.html"},
+        {"role": "frontend", "company": "接龙管家（拓宇科技）", "title": "前端开发实习 2026 届", "city": "青岛", "url": "https://www.zhipin.com/job_detail/a11c4dbed920051203dz3tu0E1pS.html"},
+        {"role": "data-analyst", "company": "大禹集团", "title": "数据分析实习生", "city": "苏州", "url": "https://www.91job.org.cn/recruitment/jobDetails?zpgwid=1000000000761654"},
+        {"role": "data-analyst", "company": "北京掌上先机网络科技有限公司", "title": "数据分析-校招/实习", "city": "北京", "publishedAt": "2026-11-06", "url": "https://job.ustc.edu.cn/Internship/list.aspx?itemid=278377"},
+        {"role": "data-analyst", "company": "深圳市八号仓奥特莱斯有限公司", "title": "数据分析实习生", "city": "深圳", "publishedAt": "2026-09-21", "url": "https://www.yingjiesheng.com/job-008-090-087.html"}
+      ],
+      "findings": [
+        "AI 编程工具已是普遍要求：9 份 JD 中 6 份明确列出 Cursor / Copilot / Claude Code / Trae 等，前端岗有 1 份把它写进「任职要求」而非加分项。当前 61 项词典无对应技能，是本次比对暴露的最大缺口。",
+        "后端岗普遍要求 JVM / 并发 / Maven / Linux，本模型均有覆盖，无需增删。",
+        "数据分析岗普遍要求 BI 工具（Tableau / Power BI / FineBI）与高级 Excel，词典以 bi-tool、excel 两项覆盖，粒度偏粗但方向正确。",
+        "真实 JD 的必备 / 加分结构比示例文本复杂：加分项写成独立小节，其下条目本身不带「优先」二字。这是解析器需要段落级判定的直接原因，已补测试。"
       ],
       "note": "校准时只替换 requirements 的 weight / target / type 并升版本号，数据结构不变，前端无需改动。若调整 core 与 plus 的划分，必须同步更新文档中的 core 权重合计（当前 79 / 89 / 83）并重新跑计分测试。"
     },

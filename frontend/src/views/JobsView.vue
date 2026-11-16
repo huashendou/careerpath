@@ -327,7 +327,7 @@ onMounted(() => {
             <el-input v-model="form.title" maxlength="64" placeholder="如 Java 后端开发实习生" />
           </el-form-item>
           <el-form-item label="公司">
-            <el-input v-model="form.companyName" maxlength="64" placeholder="如 示例科技" />
+            <el-input v-model="form.companyName" maxlength="64" placeholder="如 亚信科技" />
           </el-form-item>
           <el-form-item label="城市">
             <el-input v-model="form.city" maxlength="32" placeholder="如 杭州" />
@@ -370,6 +370,31 @@ onMounted(() => {
           解析：必备 {{ draftMeta.required }} / 加分 {{ draftMeta.bonus }} · {{ draftMeta.algorithm }}
         </el-tag>
       </div>
+
+      <!-- JD 原文可回溯：下面每一行的「原文片段」都是这段文字里的一句。
+           岗位数据来自公开招聘信息，给出出处才谈得上可核验——否则「解析出的要求」
+           和「凭印象写的要求」在界面上长得一模一样。 -->
+      <el-collapse v-if="reqJob" class="jd-box">
+        <el-collapse-item name="jd">
+          <template #title>
+            <span class="jd-title">JD 原文</span>
+            <el-tag v-if="reqJob.source" size="small" effect="plain" class="jd-tag">{{ reqJob.source }}</el-tag>
+            <el-link
+              v-if="reqJob.url"
+              type="primary"
+              :underline="false"
+              :href="reqJob.url"
+              target="_blank"
+              class="jd-link"
+              @click.stop
+            >
+              原始链接 ↗
+            </el-link>
+          </template>
+          <pre class="jd-text">{{ reqJob.rawDescription || '这条岗位没有保存 JD 原文。' }}</pre>
+          <p class="jd-note">技能要求由这段原文解析而来，表格里每条的「原文片段」都能在文中找到对应句子。</p>
+        </el-collapse-item>
+      </el-collapse>
 
       <el-table v-loading="reqLoading" :data="rows" size="small" border max-height="360">
         <el-table-column label="技能" min-width="220">
@@ -486,5 +511,46 @@ onMounted(() => {
   align-items: center;
   margin: 0 8px;
   vertical-align: middle;
+}
+
+/* JD 原文区：默认收起，展开后限高滚动，不把要求表格挤出视口 */
+.jd-box {
+  margin-bottom: 10px;
+  border-top: none;
+}
+
+.jd-title {
+  margin-right: 8px;
+  font-size: 13px;
+  color: var(--cp-text-2);
+}
+
+.jd-tag {
+  margin-right: 10px;
+}
+
+.jd-link {
+  font-size: 12px;
+}
+
+.jd-text {
+  max-height: 210px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  background: #fafbfe;
+  border: 1px solid var(--cp-border);
+  border-radius: 8px;
+  font-family: var(--cp-font);
+  font-size: 12px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  color: var(--cp-text-2);
+}
+
+.jd-note {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--cp-text-3);
 }
 </style>

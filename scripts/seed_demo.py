@@ -18,17 +18,44 @@ import urllib.error
 import urllib.request
 
 JD_BACKEND = (
-    "岗位职责：负责后端接口开发与数据库设计，参与需求评审。\n"
-    "任职要求：1. 熟悉 Java 基础与集合框架，了解多线程与并发；2. 熟悉 Spring Boot 与 MyBatis；"
-    "3. 熟悉 MySQL，能编写 SQL 并做索引优化；4. 熟悉 Redis 缓存；5. 熟悉 Git 与 Linux 常用命令。\n"
-    "加分项：有 Docker 部署经验者优先；了解消息队列（Kafka / RabbitMQ）者优先。"
+    "【工作职责】\n"
+    "1. 参与公司 Java 后端项目的需求分析、功能开发、接口联调、测试及问题排查；\n"
+    "2. 使用 Java、Spring Boot 等技术完成业务功能和接口开发；\n"
+    "3. 熟练使用 AI 编程工具辅助开发，提高需求理解、编码、调试、测试和代码优化效率；\n"
+    "4. 配合前端、测试及其他研发人员完成项目开发和版本交付。\n"
+    "【任职要求】\n"
+    "1. 计算机、软件工程、人工智能等相关专业在校生，本科及以上学历；\n"
+    "2. 具备良好的 Java 基础，了解集合、多线程、异常处理、JVM 等基础知识；\n"
+    "3. 熟悉 Spring Boot，了解 MyBatis、MySQL、Redis 等常用开发技术；\n"
+    "4. 掌握 Git、Maven 等常用开发工具，具备基本的 Linux 使用能力；\n"
+    "5. 对 AI、大模型及 AI 编程有一定了解，能够熟练使用 Cursor、Codex、Claude Code、"
+    "GitHub Copilot、Trae 等一种或多种 AI 编程工具；\n"
+    "6. 具备较强的学习能力、逻辑思维和问题解决能力，对新技术有兴趣；\n"
+    "7. 工作认真负责，具备良好的沟通能力和主动性。"
 )
 
 JD_FRONTEND = (
-    "岗位职责：负责 Web 前端页面与组件开发。\n"
-    "任职要求：1. 熟悉 JavaScript 核心语法与 ES6；2. 熟悉 Vue 框架与组件化开发；"
-    "3. 熟悉 HTML 与 CSS 布局；4. 了解前端构建工具；5. 熟悉 Git。"
+    "【岗位要求】\n"
+    "1. 精通各类前端技术（HTML/CSS/JavaScript）等，熟悉 ES6、TypeScript 等语言技能，"
+    "熟悉或了解多端开发（mobile、pc）；\n"
+    "2. 掌握至少一种领域内常见框架（React、Vue）的原理和使用；\n"
+    "3. 熟悉或了解前端工程化，Webpack、Rollup、Vite，了解工程化脚手架工作原理、"
+    "能够独立完成工程化、模块化的开发；\n"
+    "4. 自驱、负责、良好的沟通能力、团队协作能力、规划能力。\n"
+    "【加分项】（满足其一即为加分）\n"
+    "1. 具备客户端（native）开发经验；\n"
+    "2. 具备低代码、无代码平台开发经验；\n"
+    "3. 具备 AI、agent 研究经历或项目经历；\n"
+    "4. 高知名度博客、开源项目、开源组件库等经验。"
 )
+
+# JD 出处（2026-11 检索，只摘「岗位职责 / 任职要求」，去掉联系方式与福利）：
+#   后端 亚信科技（中国）有限公司 · Java 开发实习生 · 厦门
+#        https://www.yingjiesheng.com/job-008-140-689.html  发布 2026-11-03
+#   前端 淘天集团 · 前端开发工程师（26 届实习）· 杭州
+#        https://www.zhipin.com/job_detail/db1a2dbfea2386dc03d639-0GVNV.html
+# 用真实 JD 而不是自编的一段：自编文本抽出来的技能要求，评审没法判断是真的招聘要这个，
+# 还是为了让演示好看而凑的；真实原文还能顺带检验解析器对长句、括号、顿号列举的鲁棒性。
 
 
 def request(method: str, url: str, token: str | None = None, body: dict | None = None):
@@ -84,15 +111,31 @@ def main() -> int:
                 return item["id"]
         return None
 
-    def create_job(title: str, city: str, company: str, jd: str, salary: tuple[int, int]) -> int:
+    def upsert_job(title: str, city: str, company: str, jd: str,
+                   source: str, url: str, salary: tuple[int, int] | None = None) -> int:
+        """岗位幂等写入：已存在就更新 JD 并重新解析。
+
+        早先这里是「已存在则直接返回」，于是换一份 JD 就得手删库——演示数据一改，
+        脚本就装死。现在走更新：字段与原文先写回去，再重新解析、用解析结果覆盖要求，
+        跑完脚本后「库里的要求」与「JD 原文」必然一致。
+
+        标题保持不变、只换公司和 JD：标题变了 find_job 就找不到旧行，
+        会在旁边新建一条，把匹配历史与投递记录晾在旧行上。
+        """
+        body = {
+            "title": title, "companyName": company, "city": city,
+            "salaryMin": salary[0] if salary else None,
+            "salaryMax": salary[1] if salary else None,
+            "source": source, "url": url, "rawDescription": jd,
+        }
         existing = find_job(title)
         if existing:
-            return existing
-        _, job = request("POST", f"{base}/api/jobs", token, {
-            "title": title, "companyName": company, "city": city,
-            "salaryMin": salary[0], "salaryMax": salary[1], "source": "手动粘贴", "rawDescription": jd,
-        })
-        job_id = job["id"]
+            request("PUT", f"{base}/api/jobs/{existing}", token, body)
+            job_id = existing
+        else:
+            _, job = request("POST", f"{base}/api/jobs", token, body)
+            job_id = job["id"]
+
         _, parsed = request("POST", f"{base}/api/jobs/{job_id}/parse", token)
         items = [
             {"skillId": r["skillId"], "reqType": r["reqType"], "weight": r["weight"],
@@ -101,10 +144,15 @@ def main() -> int:
             for r in parsed.get("requirements", [])
         ]
         request("PUT", f"{base}/api/jobs/{job_id}/requirements", token, {"items": items})
+        print(f"岗位就绪：{company} · {title}（解析出 {len(items)} 项要求）")
         return job_id
 
-    backend_id = create_job("Java 后端开发实习生", "杭州", "示例科技", JD_BACKEND, (200, 300))
-    frontend_id = create_job("Web 前端开发实习生", "杭州", "示例网络", JD_FRONTEND, (180, 260))
+    backend_id = upsert_job(
+        "Java 后端开发实习生", "厦门", "亚信科技（中国）有限公司", JD_BACKEND,
+        "应届生求职网", "https://www.yingjiesheng.com/job-008-140-689.html", (120, 150))
+    frontend_id = upsert_job(
+        "Web 前端开发实习生", "杭州", "淘天集团", JD_FRONTEND,
+        "BOSS直聘", "https://www.zhipin.com/job_detail/db1a2dbfea2386dc03d639-0GVNV.html")
 
     # 前端岗：把 vue 改成「vue 或 react」二选一，用来演示 anyOf 取高者计分
     _, current = request("GET", f"{base}/api/jobs/{frontend_id}/requirements", token)
@@ -118,7 +166,11 @@ def main() -> int:
         items.append(row)
     request("PUT", f"{base}/api/jobs/{frontend_id}/requirements", token, {"items": items})
 
-    # 自评：既有「达标」也有「偏弱 / 缺失」，差距清单才有多态
+    # 自评：既有「达标」也有「偏弱 / 缺失」，差距清单才有多态。
+    # 补 build-tool-java / orm-framework / api-integration / linux 四项，不是为了把分做高：
+    # 证据里写着「独立完成后端接口与数据库设计」、项目写了「接口 QPS 压测到 300」，
+    # 却说不会 Maven、不会 MyBatis、没联调过接口，数据自相矛盾——
+    # 真实岗位的 JD 一换成实际要求，这种矛盾就会以「凭空多出四条差距」的形式暴露。
     request("PUT", f"{base}/api/user-skills", token, {"items": [
         {"skillId": "java-basic", "level": 4, "learnedAt": "2025-09-01", "lastUsedAt": "2026-10-01"},
         {"skillId": "spring-boot", "level": 2},
@@ -126,6 +178,10 @@ def main() -> int:
         {"skillId": "db-mysql", "level": 2},
         {"skillId": "redis", "level": 1},
         {"skillId": "git", "level": 4},
+        {"skillId": "build-tool-java", "level": 2},
+        {"skillId": "orm-framework", "level": 2},
+        {"skillId": "api-integration", "level": 2},
+        {"skillId": "linux", "level": 2},
         {"skillId": "js-core", "level": 3},
         {"skillId": "react", "level": 1},
         {"skillId": "html-css", "level": 2},
@@ -206,7 +262,7 @@ def main() -> int:
             "result": "pass", "relatedSkills": ["spring-boot", "redis"],
         })
         request("POST", f"{base}/api/interviews", token, {
-            "companyName": "示例网络", "jobTitle": "Web 前端开发实习生",
+            "companyName": "淘天集团", "jobTitle": "Web 前端开发实习生",
             "interviewDate": "2026-11-22", "round": "二面", "format": "onsite",
             "questions": [{"question": "Vue 响应式原理讲一下", "selfRating": 3, "note": "Proxy 说了，依赖收集没说透"}],
             "reflection": "等结果，准备手写题。", "result": "pending",
