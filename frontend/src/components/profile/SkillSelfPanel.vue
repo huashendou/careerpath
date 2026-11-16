@@ -18,6 +18,12 @@ const levels = reactive({})
 const original = ref({})
 const activeCategory = ref('')
 
+// 按岗位过滤：解析完 JD 就已经知道这岗位要哪十几项，却要人回全量 61 项里翻，
+// 是最没必要的一步点击。选中岗位后只显示它要求（必备 + 加分）的技能。
+const jobs = ref([])
+const activeJob = ref(null)
+const allowedIds = ref(null)
+
 const anchors = [
   { level: 0, label: '未接触', hint: '没学过，也说不清它解决什么问题' },
   { level: 1, label: '听过概念', hint: '看过教程，能解释是什么，没动过手' },
@@ -27,11 +33,15 @@ const anchors = [
   { level: 5, label: '可教他人', hint: '能设计取舍、定位疑难问题，并讲清楚为什么' },
 ]
 
+const visibleSkills = computed(() => (allowedIds.value
+  ? skills.value.filter((skill) => allowedIds.value.has(skill.id))
+  : skills.value))
+
 const grouped = computed(() => categories.value
   .filter((category) => !activeCategory.value || category.id === activeCategory.value)
   .map((category) => ({
     ...category,
-    items: skills.value.filter((skill) => skill.categoryId === category.id),
+    items: visibleSkills.value.filter((skill) => skill.categoryId === category.id),
   }))
   .filter((group) => group.items.length))
 
@@ -40,13 +50,15 @@ const dirtyCount = computed(() => Object.keys(levels).filter((id) => levels[id] 
 async function load() {
   loading.value = true
   try {
-    const [cats, list, mine] = await Promise.all([
+    const [cats, list, mine, jobList] = await Promise.all([
       http.get('/skills/categories'),
       http.get('/skills'),
       http.get('/user-skills'),
+      http.get('/jobs', { params: { page: 1, size: 100 } }).catch(() => ({ items: [] })),
     ])
     categories.value = cats.items
     skills.value = list.items
+    jobs.value = jobList.items || []
     const map = {}
     for (const skill of list.items) map[skill.id] = 0
     for (const item of mine.items) map[item.skillId] = item.level
@@ -57,6 +69,29 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+/** 切岗位：拉该岗位的技能要求，只保留这些技能；清空则回到全部 61 项。 */
+async function onJobChange() {
+  if (!activeJob.value) {
+    allowedIds.value = null
+    return
+  }
+  try {
+    const data = await http.get(`/jobs/${activeJob.value}/requirements`)
+    allowedIds.value = new Set((data.items || []).map((item) => item.skillId))
+    if (!allowedIds.value.size) {
+      ElMessage.info('这个岗位还没有技能要求，先到「岗位」页解析一次')
+    }
+  } catch (error) {
+    allowedIds.value = null
+    ElMessage.error(error.message || '岗位要求加载失败')
+  }
+}
+
+function clearJob() {
+  activeJob.value = null
+  allowedIds.value = null
 }
 
 async function save() {
@@ -94,6 +129,16 @@ onMounted(load)
         <p class="sub">按 0–5 级行为锚定自评。没自评过的技能按 0 处理，但会在匹配页提示「尚未完成自评」，不会显示 0%。</p>
       </div>
       <div class="head-actions">
+        <el-select
+          v-model="activeJob"
+          size="small"
+          placeholder="只看某个岗位相关"
+          clearable
+          style="width: 200px"
+          @change="onJobChange"
+        >
+          <el-option v-for="job in jobs" :key="job.id" :label="job.title" :value="job.id" />
+        </el-select>
         <el-select v-model="activeCategory" size="small" placeholder="全部维度" clearable style="width: 150px">
           <el-option v-for="item in categories" :key="item.id" :label="item.name" :value="item.id" />
         </el-select>
@@ -102,6 +147,11 @@ onMounted(load)
         </el-button>
       </div>
     </div>
+
+    <p v-if="allowedIds" class="filter-hint">
+      只显示该岗位要求的 {{ allowedIds.size }} 项，其余 {{ skills.length - allowedIds.size }} 项已折叠。
+      <el-link type="primary" :underline="false" @click="clearJob">看全部</el-link>
+    </p>
 
     <el-collapse class="anchors">
       <el-collapse-item title="0–5 级锚点说明（自评前先看一眼）" name="1">
@@ -133,7 +183,10 @@ onMounted(load)
       </div>
     </section>
 
-    <el-empty v-if="!loading && !grouped.length" description="没有技能数据" />
+    <el-empty
+      v-if="!loading && !grouped.length"
+      :description="allowedIds ? '这个岗位的技能要求还匹配不到技能库里' : '没有技能数据'"
+    />
   </div>
 </template>
 
@@ -161,6 +214,12 @@ onMounted(load)
   font-size: 11.5px;
   color: var(--cp-text-3);
   max-width: 620px;
+}
+
+.filter-hint {
+  margin: -4px 0 2px;
+  font-size: 11.5px;
+  color: var(--cp-text-3);
 }
 
 .head-actions {

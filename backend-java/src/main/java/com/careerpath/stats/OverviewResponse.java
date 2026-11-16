@@ -9,6 +9,9 @@ import java.time.Instant;
  * 绝不用示例数字填充——答辩时被问「这个 3 是哪来的」答不上来，比显示 0 难看得多。
  *
  * <p>lastMatch 为 null 表示还没做过匹配，前端应引导去做第一次匹配，而不是展示 0 分。
+ *
+ * <p>lastMatch 里带 jobPositionId：概览要能「一键回到上次那份报告」，只给标题做不到，
+ * 前端只能让用户自己去岗位列表里找，白跑一趟。
  */
 public record OverviewResponse(
         boolean profileCompleted,
@@ -19,6 +22,7 @@ public record OverviewResponse(
         Instant generatedAt
 ) {
 
-    public record LastMatch(String jobTitle, Double requiredScore, Double bonusScore, Instant createdAt) {
+    public record LastMatch(Long jobPositionId, String jobTitle, Double requiredScore,
+                            Double bonusScore, Instant createdAt) {
     }
 }

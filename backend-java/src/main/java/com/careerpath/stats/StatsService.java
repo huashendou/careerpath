@@ -80,13 +80,14 @@ public class StatsService {
     /** 取最近一次匹配。没有记录返回 null，前端据此显示「还没有匹配记录」而不是 0 分。 */
     private OverviewResponse.LastMatch lastMatch(Long userId) {
         List<OverviewResponse.LastMatch> rows = jdbc.query("""
-                SELECT j.title, r.required_score, r.bonus_score, r.created_at
+                SELECT j.id, j.title, r.required_score, r.bonus_score, r.created_at
                   FROM skill_match_result r
                   JOIN job_position j ON j.id = r.job_position_id
                  WHERE r.user_id = ?
                  ORDER BY r.created_at DESC, r.id DESC
                  LIMIT 1
                 """, (rs, rowNum) -> new OverviewResponse.LastMatch(
+                        rs.getLong("id"),
                         rs.getString("title"),
                         nullableDouble(rs, "required_score"),
                         nullableDouble(rs, "bonus_score"),
